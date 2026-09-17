@@ -44,7 +44,7 @@ The actual context split is:
 | Development, ConfigLinks | User |
 | Manual | Read-only follow-up list |
 
-Continue one stage at a time when running `Bootstrap.ps1` directly. Run Windows, Toolchains and Containers in both contexts. Containers must run its machine work before its user work: symlink evaluation and WSL features are machine-scoped, while setting WSL2 as the default is user-scoped. After a reboot request, reboot yourself and rerun that stage. Open a fresh terminal after foundations or runtime installs if PATH still needs refreshing.
+Continue one stage at a time when running `Bootstrap.ps1` directly. Run Windows, Toolchains and Containers in both contexts. Containers must run its machine work before its user work: symlink evaluation and WSL features are machine-scoped, while setting WSL2 as the default and registering Rocky Linux are user-scoped. After a reboot request, reboot yourself and rerun that stage. Open a fresh terminal after foundations or runtime installs if PATH still needs refreshing.
 
 On a fresh Windows installation, finish Windows Update and driver installation and clear all pending restarts before Codex's first launch. Its one-time sandbox setup requests administrator approval and can loop if Windows is still servicing the machine. Recovery steps are in [the follow-up checklist](docs/POST-INSTALL.md#codex-first-launch-and-uac).
 
@@ -115,7 +115,7 @@ A lock pins a fresh bootstrap install to that version and makes the managed upda
 | Database | SSMS 22 and Bruno; explicit dbForge and MariaDB-client follow-up |
 | AI | Claude desktop and Claude Code; current ChatGPT desktop download is a manual step |
 | Apps | Termius, Oh My Posh, Notepad++, Steam, PowerToys, Chrome, EarTrumpet, Tailscale, Windscribe, Apple Music, WhatsApp, Paste File, Simple Screen Ruler; NVIDIA App via its official installer |
-| Containers | Machine-scoped symlink repair and WSL/Virtual Machine Platform features; user-scoped WSL2 default; distro chosen explicitly; Docker Desktop opt-in |
+| Containers | Machine-scoped symlink repair and WSL/Virtual Machine Platform features; user-scoped WSL2 default; checksum-verified Rocky Linux 10 WSL image, registered as the default distro; Docker Desktop opt-in |
 | Development | Git defaults/LFS, PowerShell `csrc` navigation helper and Oh My Posh initialization, pnpm, Codex CLI, Codex/Claude Windows Terminal profiles, credential-free AWS profile example |
 | ConfigLinks | Flat navigation tree at `D:\Config`; directory junctions and file shortcuts; generated location/secrets index |
 | Manual | Sign-ins, defaults, NVIDIA Studio selection, keyboard-lighting TBD, Git identity, Quick Access, development-location preferences |
@@ -124,7 +124,7 @@ The exact package manifest lives in `roles/`. Every item from the discussion is 
 
 ## Edit preferences and reuse
 
-Edit `profiles/Catwoman.psd1`: paths, role selection, Node major, Docker toggle, package version locks, Git line endings, power timeouts and Explorer restart preference are near the top. Default timeouts are AC display 20 minutes/sleep 60 minutes; battery display 10 minutes/sleep 20 minutes. These are initial implementation choices because exact timings were not specified. The new Windows 11 context menu is untouched.
+Edit `profiles/Catwoman.psd1`: paths, role selection, Node major, Rocky WSL major/name/default choice, Docker toggle, package version locks, Git line endings, power timeouts and Explorer restart preference are near the top. Rocky major 10 is the default; major 9 is also accepted. Default timeouts are AC display 20 minutes/sleep 60 minutes; battery display 10 minutes/sleep 20 minutes. These are initial implementation choices because exact timings were not specified. The new Windows 11 context menu is untouched.
 
 `config/Windows.psd1` contains named registry preferences. `roles/*.psd1` contains package and manual entries. `modules/Eceni.psm1` implements the operations. To add another workstation, copy the profile and supply `-Profile .\profiles\Other.psd1`. Future Linux/server engines are an architectural extension, not a claim of v0.1 support.
 

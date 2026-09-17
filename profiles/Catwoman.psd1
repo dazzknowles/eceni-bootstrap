@@ -13,6 +13,12 @@
     )
     Options = @{
         Docker = $false
+        RockyWsl = @{
+            Enabled = $true
+            Major = 10
+            DistroName = 'RockyLinux-10'
+            SetDefault = $true
+        }
         NodeMajor = 24
         RestartExplorer = $true
         MonitorMinutesAC = 20

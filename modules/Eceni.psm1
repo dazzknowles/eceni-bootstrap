@@ -24,6 +24,14 @@ function Import-EceniProfile {
         if ($name -match '[*?\[\]]' -or $name -in $p.Keep -or $name -match 'Solitaire|WindowsStore|DesktopAppInstaller|WebView') { throw "Unsafe removal entry: $name" }
     }
     if ($p.Options.NodeMajor -notmatch '^\d+$') { throw 'NodeMajor must be a numeric LTS major.' }
+    if ($p.Options.ContainsKey('RockyWsl')) {
+        $rocky = $p.Options.RockyWsl
+        foreach ($key in 'Enabled','Major','DistroName','SetDefault') {
+            if (-not $rocky.ContainsKey($key)) { throw "RockyWsl is missing $key." }
+        }
+        if ([string]$rocky.Major -notin @('9','10')) { throw 'RockyWsl.Major must be a currently supported WSL image major: 9 or 10.' }
+        if ([string]$rocky.DistroName -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$') { throw 'RockyWsl.DistroName contains unsafe characters.' }
+    }
     if (-not $p.Options.ContainsKey('PackageVersionLocks')) { $p.Options.PackageVersionLocks = @{} }
     $knownPackageIds = @(
         foreach ($role in $p.Roles) {
@@ -86,7 +94,10 @@ function Get-EceniPlan {
             }
             $items.Add((New-EceniOperation $package.Stage 'Package' "Install $($package.Name)" $detail $packageData))
         }
-        foreach ($task in $data.Manual) { $items.Add((New-EceniOperation $task.Stage 'Manual' $task.Name ($task.Instructions + ' ' + $task.Url) $task)) }
+        foreach ($task in $data.Manual) {
+            if ($task.Name -eq 'WSL distribution' -and $Profile.Options.ContainsKey('RockyWsl') -and $Profile.Options.RockyWsl.Enabled) { continue }
+            $items.Add((New-EceniOperation $task.Stage 'Manual' $task.Name ($task.Instructions + ' ' + $task.Url) $task))
+        }
     }
     if ($Profile.Roles -contains 'Developer') {
         $items.Add((New-EceniOperation 'Toolchains' 'Node' 'Node LTS via NVM' "Latest LTS patch in approved major $($Profile.Options.NodeMajor); existing matching installation reused"))
@@ -94,7 +105,12 @@ function Get-EceniPlan {
         $items.Add((New-EceniOperation 'Toolchains' 'VCWorkload' 'Verify C++ workload' 'MSVC x64/x86 tools and recommended Windows SDK via Visual Studio Installer'))
         $items.Add((New-EceniOperation 'Containers' 'Symlink' 'Restore symlink evaluation defaults' 'Allow local-origin links; keep remote-origin links disabled; required by Windows component servicing'))
         foreach ($name in 'Microsoft-Windows-Subsystem-Linux','VirtualMachinePlatform') { $items.Add((New-EceniOperation 'Containers' 'Feature' "Enable $name" 'Enable WSL2 prerequisite; never reboot automatically' @{Name=$name;Enabled=$true})) }
-        $items.Add((New-EceniOperation 'Containers' 'Wsl2' 'Default to WSL2' 'Set default version after features/reboot; distro choice remains explicit'))
+        $items.Add((New-EceniOperation 'Containers' 'Wsl2' 'Default to WSL2' 'Set default version after features/reboot, before registering Rocky Linux'))
+        if ($Profile.Options.ContainsKey('RockyWsl') -and $Profile.Options.RockyWsl.Enabled) {
+            $rocky = $Profile.Options.RockyWsl
+            $items.Add((New-EceniOperation 'Containers' 'WslDistro' "Install Rocky Linux $($rocky.Major) for WSL" "Download the official checksum-verified WSL image and register it as $($rocky.DistroName)" $rocky))
+            $items.Add((New-EceniOperation 'Containers' 'Manual' 'Finish Rocky Linux first launch' "Launch $($rocky.DistroName) once and choose its Linux username and password."))
+        }
         $items.Add((New-EceniOperation 'Development' 'Git' 'Configure Git and LFS' "Default branch main; long paths; autocrlf=$($Profile.Options.GitAutoCrlf); LFS filters"))
         $items.Add((New-EceniOperation 'Development' 'Shell' 'PowerShell navigation and prompt' 'Append managed csrc/Oh My Posh block to PowerShell 7 profile; preserve existing content'))
         $items.Add((New-EceniOperation 'Development' 'Npm' 'pnpm' 'pnpm (current selected NVM Node)' @{Package='pnpm'}))
@@ -113,7 +129,7 @@ function Get-EceniPlan {
             $selected = @($items | Where-Object Stage -eq $s)
             if ($s -eq 'Containers') {
                 # Docker can only follow the WSL features and WSL2 default.
-                foreach ($kind in 'Symlink','Feature','Wsl2','Package','Manual') { $selected | Where-Object Kind -eq $kind }
+                foreach ($kind in 'Symlink','Feature','Wsl2','WslDistro','Package','Manual') { $selected | Where-Object Kind -eq $kind }
             } else { $selected }
         }
     }
@@ -128,7 +144,7 @@ function Test-EceniAdministrator {
 function Get-EceniOperationContext {
     param($Operation)
     if ($Operation.Kind -eq 'Registry' -and $Operation.Data.Path -like 'HKCU:*') { return 'User' }
-    if ($Operation.Kind -in @('Appx','Wsl2','Git','Rust','Shell','Npm','TerminalProfiles','Aws','Links')) { return 'User' }
+    if ($Operation.Kind -in @('Appx','Wsl2','WslDistro','Git','Rust','Shell','Npm','TerminalProfiles','Aws','Links')) { return 'User' }
     if ($Operation.Kind -in @('Package','Uninstall') -and $Operation.Data.ContainsKey('Scope') -and $Operation.Data.Scope -eq 'User') { return 'User' }
     if ($Operation.Kind -eq 'Manual') { return 'Any' }
     return 'Machine'
@@ -382,6 +398,87 @@ function Set-EceniRemoteDesktop {
     if ($disabled.Count) { throw 'One or more Remote Desktop firewall rules remain disabled.' }
     if ($changed) { return New-EceniResult 'Changed' 'Remote Desktop enabled with Network Level Authentication and built-in TCP/UDP firewall rules.' }
     New-EceniResult 'AlreadyOK' 'Remote Desktop, Network Level Authentication and firewall rules are enabled.'
+}
+
+function Get-EceniWslDistroNames {
+    $r = Invoke-EceniNative 'wsl.exe' @('--list','--quiet')
+    Assert-EceniNativeSuccess $r 'List WSL distributions'
+    @($r.Output.Replace(([char]0).ToString(),'') -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+
+function Get-EceniDefaultWslDistro {
+    $root = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss'
+    $state = Get-ItemProperty -LiteralPath $root -ErrorAction SilentlyContinue
+    if (-not $state -or -not $state.PSObject.Properties['DefaultDistribution'] -or -not $state.DefaultDistribution) { return $null }
+    $distro = Get-ItemProperty -LiteralPath (Join-Path $root $state.DefaultDistribution) -ErrorAction SilentlyContinue
+    if ($distro -and $distro.PSObject.Properties['DistributionName']) { return [string]$distro.DistributionName }
+    $null
+}
+
+function Invoke-EceniDownload {
+    param([string]$Uri,[string]$OutFile)
+    $r = Invoke-EceniNative 'curl.exe' @('--fail','--location','--silent','--show-error','--output',$OutFile,$Uri)
+    Assert-EceniNativeSuccess $r "Download $Uri"
+}
+
+function Install-EceniRockyWsl {
+    param(
+        [hashtable]$Config,
+        [string]$CacheRoot = (Join-Path $env:LOCALAPPDATA 'Eceni\Downloads')
+    )
+    $name = [string]$Config.DistroName
+    $installed = @(Get-EceniWslDistroNames)
+    if ($name -in $installed) {
+        if ($Config.SetDefault -and (Get-EceniDefaultWslDistro) -ne $name) {
+            $r = Invoke-EceniNative 'wsl.exe' @('--set-default',$name); Assert-EceniNativeSuccess $r "Set $name as default WSL distribution"
+            return New-EceniResult 'Changed' "$name was already installed and is now the default WSL distribution."
+        }
+        return New-EceniResult 'AlreadyOK' "$name is installed$(if ($Config.SetDefault) { ' and is the default' })."
+    }
+
+    $help = Invoke-EceniNative 'wsl.exe' @('--help')
+    Assert-EceniNativeSuccess $help 'Read WSL capabilities'
+    $helpText = $help.Output.Replace(([char]0).ToString(),'')
+    if ($helpText -notmatch '--from-file' -or $helpText -notmatch '--name') { throw 'The installed WSL runtime does not support .wsl images. Run wsl --update, reboot if requested, then rerun Containers.' }
+
+    $major = [string]$Config.Major
+    $architecture = switch ($env:PROCESSOR_ARCHITECTURE) {
+        'ARM64' { 'aarch64' }
+        'AMD64' { 'x86_64' }
+        default { throw "Rocky WSL images are not configured for processor architecture: $env:PROCESSOR_ARCHITECTURE" }
+    }
+    $fileName = "Rocky-$major-WSL-Base.latest.$architecture.wsl"
+    $baseUri = "https://download.rockylinux.org/pub/rocky/$major/images/$architecture"
+    $imageUri = "$baseUri/$fileName"
+    $checksumUri = "$imageUri.CHECKSUM"
+    New-Item -ItemType Directory -Path $CacheRoot -Force | Out-Null
+    $imagePath = Join-Path $CacheRoot $fileName
+    $checksumPath = $imagePath + '.CHECKSUM'
+
+    Invoke-EceniDownload $checksumUri $checksumPath
+    $checksumText = [IO.File]::ReadAllText($checksumPath)
+    $match = [regex]::Match($checksumText,'(?i)\b[0-9a-f]{64}\b')
+    if (-not $match.Success) { throw "Rocky's checksum file did not contain a SHA-256 value: $checksumUri" }
+    $expectedHash = $match.Value.ToUpperInvariant()
+    $downloadRequired = $true
+    if (Test-Path -LiteralPath $imagePath -PathType Leaf) {
+        $downloadRequired = (Get-FileHash -LiteralPath $imagePath -Algorithm SHA256).Hash -ne $expectedHash
+    }
+    if ($downloadRequired) {
+        if (Test-Path -LiteralPath $imagePath) { Remove-Item -LiteralPath $imagePath -Force }
+        Invoke-EceniDownload $imageUri $imagePath
+    }
+    $actualHash = (Get-FileHash -LiteralPath $imagePath -Algorithm SHA256).Hash
+    if ($actualHash -ne $expectedHash) { throw "Rocky WSL image checksum mismatch. Expected $expectedHash but downloaded $actualHash. The image was not installed." }
+
+    $r = Invoke-EceniNative 'wsl.exe' @('--install','--from-file',$imagePath,'--name',$name,'--version','2','--no-launch')
+    Assert-EceniNativeSuccess $r "Install $name"
+    if ($name -notin @(Get-EceniWslDistroNames)) { throw "$name was not listed after WSL reported a successful installation." }
+    if ($Config.SetDefault) {
+        $r = Invoke-EceniNative 'wsl.exe' @('--set-default',$name); Assert-EceniNativeSuccess $r "Set $name as default WSL distribution"
+    }
+    Remove-Item -LiteralPath $imagePath,$checksumPath -Force -ErrorAction SilentlyContinue
+    New-EceniResult 'Changed' "$name installed from Rocky's checksum-verified WSL image$(if ($Config.SetDefault) { ' and set as default' }). Launch it once to create the Linux user."
 }
 
 function Set-EceniGit {
@@ -673,8 +770,9 @@ function Invoke-EceniOperation {
             $state = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss' -ErrorAction SilentlyContinue
             if ($state -and $state.PSObject.Properties['DefaultVersion'] -and $state.DefaultVersion -eq 2) { return New-EceniResult 'AlreadyOK' 'WSL2 is the default.' }
             $r = Invoke-EceniNative 'wsl.exe' @('--set-default-version','2'); Assert-EceniNativeSuccess $r 'Set WSL2 default'
-            return New-EceniResult 'Changed' 'Default version is WSL2. Choose/install the distro separately.'
+            return New-EceniResult 'Changed' 'Default version is WSL2.'
         }
+        'WslDistro' { return Install-EceniRockyWsl $Operation.Data }
         'Power' { return Set-EceniPower $Profile.Options $LogRoot }
         'RemoteDesktop' { return Set-EceniRemoteDesktop $Operation.Data $LogRoot }
         'Git' { return Set-EceniGit $Profile.Options }

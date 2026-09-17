@@ -42,13 +42,17 @@ $profile.Options.PackageVersionLocks.Remove('Microsoft.PowerToys')
 $profile.Options.Docker = $true
 Assert (@(Get-EceniPlan $profile $root | Where-Object { $_.Data.Id -eq 'Docker.DockerDesktop' }).Count -eq 1) 'Docker opt-in includes exactly one installer'
 $containerPlan = @(Get-EceniPlan $profile $root -Stage Containers)
-Assert (($containerPlan[0..4].Kind -join ',') -eq 'Symlink,Feature,Feature,Wsl2,Package') 'Symlink repair, WSL features and version setup precede optional Docker install'
+Assert (($containerPlan[0..5].Kind -join ',') -eq 'Symlink,Feature,Feature,Wsl2,WslDistro,Package') 'Symlink repair, WSL features, WSL2 default and Rocky installation precede optional Docker install'
 $profile.Options.Docker = $false
 $stages = @(Get-EceniPlan $profile $root -Stage @('Foundations','AI') | Select-Object -ExpandProperty Stage -Unique)
 Assert (($stages -join ',') -eq 'Foundations,AI') 'Stage selection preserves canonical order'
 $packages = @($plan | Where-Object Kind -eq 'Package')
 Assert (@($packages | Group-Object Detail | Where-Object Count -gt 1).Count -eq 0) 'No duplicate package installs'
 Assert (@($plan | Where-Object { $_.Name -eq 'Keyboard lighting' -and $_.Kind -eq 'Manual' }).Count -eq 1) 'Keyboard lighting remains pending'
+$rockyWsl = @($plan | Where-Object Kind -eq 'WslDistro')
+Assert ($rockyWsl.Count -eq 1 -and $rockyWsl[0].Data.Major -eq 10 -and $rockyWsl[0].Data.DistroName -eq 'RockyLinux-10') 'Rocky Linux 10 is the configured WSL distribution'
+Assert ((Get-EceniOperationContext $rockyWsl[0]) -eq 'User') 'Rocky WSL registration uses normal user context'
+Assert (@($plan | Where-Object Name -eq 'WSL distribution').Count -eq 0) 'Configured Rocky installation replaces the obsolete choose-a-distro follow-up'
 Assert (@($plan | Where-Object { $_.Kind -eq 'TerminalProfiles' -and $_.Name -eq 'Codex and Claude Terminal profiles' }).Count -eq 1) 'Development includes managed Codex and Claude Windows Terminal profiles'
 Assert ((Get-EceniOperationContext ($plan | Where-Object Kind -eq 'TerminalProfiles')) -eq 'User') 'Windows Terminal profiles use normal user context'
 Assert ((Get-EceniOperationContext ($plan | Where-Object { $_.Name -eq 'Show file extensions' })) -eq 'User') 'HKCU settings use normal user context'
@@ -97,6 +101,8 @@ $text.Replace("'Microsoft.Copilot'","'Microsoft.MicrosoftSolitaireCollection'") 
 Assert-Throws { Import-EceniProfile $bad $root } 'Protected app removal is rejected'
 $text.Replace('PackageVersionLocks = @{}',"PackageVersionLocks = @{'No.Such.Package'='1.0'}") | Set-Content $bad
 Assert-Throws { Import-EceniProfile $bad $root } 'Version locks for unknown package IDs are rejected'
+$text.Replace('Major = 10','Major = 11') | Set-Content $bad
+Assert-Throws { Import-EceniProfile $bad $root } 'Unsupported Rocky WSL major versions are rejected'
 
 # Native mocks test exit-code handling without winget, UAC, network or installations.
 & $module {
@@ -235,6 +241,46 @@ Assert ($terminalJson.profiles.Count -eq 2 -and ($terminalJson.profiles.name -jo
 Assert ($terminalJson.profiles[0].startingDirectory -eq 'D:\Source' -and $terminalJson.profiles[0].tabColor -eq '#10A37F' -and $terminalJson.profiles[1].tabColor -eq '#D97757') 'Windows Terminal profiles use the configured source root and tab colours'
 Assert ($terminalJson.profiles[0].commandline -match 'codex' -and $terminalJson.profiles[1].commandline -match 'claude') 'Windows Terminal profiles launch the corresponding CLI'
 Assert ((Test-Path (Join-Path $terminalRoot 'codex.png')) -and (Test-Path (Join-Path $terminalRoot 'claude.png'))) 'Windows Terminal profile icons are stored beside the managed fragment'
+
+# Rocky WSL downloads are checksum-verified, installed once and made the default.
+$rockyCache = Join-Path $tmp 'rocky-cache'
+$rockySource = Join-Path $tmp 'rocky-source.wsl'
+[IO.File]::WriteAllText($rockySource,'test Rocky WSL image')
+$rockyHash = (Get-FileHash -LiteralPath $rockySource -Algorithm SHA256).Hash
+& $module {
+    param($source,$hash)
+    $script:rockySource=$source; $script:rockyHash=$hash
+    $script:rockyInstalled=@(); $script:rockyDefault=$null; $script:rockyDownloads=0
+    $script:rockyNativeCalls = New-Object 'System.Collections.Generic.List[object]'
+    function script:Get-EceniWslDistroNames { @($script:rockyInstalled) }
+    function script:Get-EceniDefaultWslDistro { $script:rockyDefault }
+    function script:Invoke-EceniDownload {
+        param([string]$Uri,[string]$OutFile)
+        $script:rockyDownloads++
+        if ($Uri -like '*.CHECKSUM') { [IO.File]::WriteAllText($OutFile,"SHA256 = $script:rockyHash") }
+        else { Copy-Item -LiteralPath $script:rockySource -Destination $OutFile }
+    }
+    function script:Invoke-EceniNative {
+        param([string]$File,[string[]]$Arguments)
+        $script:rockyNativeCalls.Add(@{File=$File;Arguments=$Arguments})
+        if ($Arguments[0] -eq '--help') { return [pscustomobject]@{Code=0;Output='--from-file --name'} }
+        if ($Arguments[0] -eq '--install') { $script:rockyInstalled=@($Arguments[[Array]::IndexOf($Arguments,'--name')+1]) }
+        if ($Arguments[0] -eq '--set-default') { $script:rockyDefault=$Arguments[1] }
+        [pscustomobject]@{Code=0;Output=''}
+    }
+} $rockySource $rockyHash
+$a = & $module { param($c,$r) Install-EceniRockyWsl $c -CacheRoot $r } $profile.Options.RockyWsl $rockyCache
+$b = & $module { param($c,$r) Install-EceniRockyWsl $c -CacheRoot $r } $profile.Options.RockyWsl $rockyCache
+$rockyCalls = & $module { $script:rockyNativeCalls.ToArray() }
+Assert ($a.Status -eq 'Changed' -and $b.Status -eq 'AlreadyOK') 'Rocky WSL installation is idempotent'
+Assert ((& $module { $script:rockyDownloads }) -eq 2) 'Rocky WSL downloads one image and one checksum only for the initial install'
+Assert (@($rockyCalls | Where-Object { $_.Arguments[0] -eq '--install' -and '--from-file' -in $_.Arguments -and '--no-launch' -in $_.Arguments -and '2' -in $_.Arguments }).Count -eq 1) 'Rocky WSL uses the modern file installer as WSL2 without launching OOBE'
+Assert ((& $module { $script:rockyDefault }) -eq 'RockyLinux-10') 'Rocky Linux is made the default WSL distribution'
+Assert (-not (Test-Path (Join-Path $rockyCache 'Rocky-10-WSL-Base.latest.x86_64.wsl'))) 'Verified Rocky installer cache is removed after successful registration'
+
+# Restore the real module functions before the remaining isolated mocks.
+Import-Module (Join-Path $root 'modules\Eceni.psm1') -Force
+$module = Get-Module Eceni
 
 # Optional-feature state handling without DISM or rebooting.
 & $module {

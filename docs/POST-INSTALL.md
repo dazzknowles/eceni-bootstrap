@@ -17,8 +17,8 @@ Do not disable UAC, lower its notification level, delete the Codex sandbox accou
 
 - [ ] In JetBrains Toolbox, sign in and install Rider, DataGrip, dotMemory, dotTrace, GoLand, WebStorm, PyCharm, IntelliJ IDEA and RustRover. Toolbox owns their updates and licensing.
 - [ ] Install [dbForge Studio for MySQL](https://www.devart.com/dbforge/mysql/studio/download.html) using your licence or chosen trial. The official installer supports `/verysilent`; v0.1 leaves vendor download/licensing interactive instead of guessing a package ID or unattended edition. No payment is made by this project.
-- [ ] Choose a WSL distro after the Containers stage and any requested reboot: `wsl --list --online`, then `wsl --install -d <exact-name>`. Ubuntu is simplest; Rocky is the existing server-family option. No distro was selected in Incubator III.
-- [ ] Install MariaDB **client** tools inside that distro (`sudo apt install mariadb-client` on Ubuntu, `sudo dnf install mariadb` on Rocky). Do not install a native Windows MariaDB server. DataGrip and dbForge supply GUI access.
+- [ ] Launch `RockyLinux-10` once after the Containers stage and any requested reboot, then choose its Linux username and password. The bootstrap downloads Rocky's official WSL image, verifies its published SHA-256 checksum, installs it without launching the interactive first-run flow, and makes it the default distro.
+- [ ] Install MariaDB **client** tools inside Rocky (`sudo dnf install mariadb`). Do not install a native Windows MariaDB server. DataGrip and dbForge supply GUI access.
 - [ ] Decide whether to enable Docker. It is off in `Catwoman.psd1`; set `Options.Docker = $true`, rerun Containers after WSL is ready, and complete Docker Desktop's first-run setup.
 - [ ] Install the current [ChatGPT Windows app](https://chatgpt.com/download/). The previously used Store ID `9NT1R1C2HH7J` is now labelled **ChatGPT Classic**, so v0.1 does not silently choose it.
 - [ ] Install the current [NVIDIA App](https://www.nvidia.com/en-gb/software/nvidia-app/) from NVIDIA's official download page. It is an Apps-stage manual item because no verified WinGet manifest is available.
