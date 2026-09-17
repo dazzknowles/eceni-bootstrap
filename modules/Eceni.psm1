@@ -437,8 +437,9 @@ function Install-EceniRockyWsl {
     }
 
     $help = Invoke-EceniNative 'wsl.exe' @('--help')
-    Assert-EceniNativeSuccess $help 'Read WSL capabilities'
     $helpText = $help.Output.Replace(([char]0).ToString(),'')
+    # Current Store WSL builds can print complete help and still return -1.
+    # Capability flags are the reliable signal; a blank/error response still fails below.
     if ($helpText -notmatch '--from-file' -or $helpText -notmatch '--name') { throw 'The installed WSL runtime does not support .wsl images. Run wsl --update, reboot if requested, then rerun Containers.' }
 
     $major = [string]$Config.Major

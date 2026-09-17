@@ -263,7 +263,7 @@ $rockyHash = (Get-FileHash -LiteralPath $rockySource -Algorithm SHA256).Hash
     function script:Invoke-EceniNative {
         param([string]$File,[string[]]$Arguments)
         $script:rockyNativeCalls.Add(@{File=$File;Arguments=$Arguments})
-        if ($Arguments[0] -eq '--help') { return [pscustomobject]@{Code=0;Output='--from-file --name'} }
+        if ($Arguments[0] -eq '--help') { return [pscustomobject]@{Code=-1;Output='--from-file --name'} }
         if ($Arguments[0] -eq '--install') { $script:rockyInstalled=@($Arguments[[Array]::IndexOf($Arguments,'--name')+1]) }
         if ($Arguments[0] -eq '--set-default') { $script:rockyDefault=$Arguments[1] }
         [pscustomobject]@{Code=0;Output=''}
@@ -273,6 +273,7 @@ $a = & $module { param($c,$r) Install-EceniRockyWsl $c -CacheRoot $r } $profile.
 $b = & $module { param($c,$r) Install-EceniRockyWsl $c -CacheRoot $r } $profile.Options.RockyWsl $rockyCache
 $rockyCalls = & $module { $script:rockyNativeCalls.ToArray() }
 Assert ($a.Status -eq 'Changed' -and $b.Status -eq 'AlreadyOK') 'Rocky WSL installation is idempotent'
+Assert (@($rockyCalls | Where-Object { $_.Arguments[0] -eq '--help' }).Count -eq 1) 'Rocky WSL accepts the documented capabilities even when wsl --help returns its anomalous -1 exit code'
 Assert ((& $module { $script:rockyDownloads }) -eq 2) 'Rocky WSL downloads one image and one checksum only for the initial install'
 Assert (@($rockyCalls | Where-Object { $_.Arguments[0] -eq '--install' -and '--from-file' -in $_.Arguments -and '--no-launch' -in $_.Arguments -and '2' -in $_.Arguments }).Count -eq 1) 'Rocky WSL uses the modern file installer as WSL2 without launching OOBE'
 Assert ((& $module { $script:rockyDefault }) -eq 'RockyLinux-10') 'Rocky Linux is made the default WSL distribution'
