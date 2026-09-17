@@ -49,16 +49,21 @@ Continue one stage at a time when running `Bootstrap.ps1` directly. Run Windows,
 On a fresh Windows installation, finish Windows Update and driver installation and clear all pending restarts before Codex's first launch. Its one-time sandbox setup requests administrator approval and can loop if Windows is still servicing the machine. Recovery steps are in [the follow-up checklist](docs/POST-INSTALL.md#codex-first-launch-and-uac).
 
 ```powershell
-.\Bootstrap.ps1 -Apply -Stage Toolchains
+.\Bootstrap.ps1 -Apply -Stage Toolchains -Context Machine   # administrator window
+.\Bootstrap.ps1 -Apply -Stage Toolchains -Context User      # normal window
 .\Bootstrap.ps1 -Apply -Stage IDEs
 .\Bootstrap.ps1 -Apply -Stage Database
 .\Bootstrap.ps1 -Apply -Stage AI
 .\Bootstrap.ps1 -Apply -Stage Apps
-.\Bootstrap.ps1 -Apply -Stage Containers
+.\Bootstrap.ps1 -Apply -Stage Containers -Context Machine   # administrator window; reboot if requested
+.\Bootstrap.ps1 -Apply -Stage Containers -Context User      # normal window, after any reboot
+wsl -d RockyLinux-10                                        # first launch: choose Linux username/password
 .\Bootstrap.ps1 -Apply -Stage Development
 .\Bootstrap.ps1 -Apply -Stage ConfigLinks
 .\Bootstrap.ps1 -Stage Manual
 ```
+
+Run each explicitly labelled Machine command in an administrator window and each User command in a normal window. If the Containers machine pass requests a reboot, reboot before its user pass; the latter downloads, verifies and registers Rocky Linux. The final `wsl` command completes Rocky's interactive first-launch account setup.
 
 `-Apply -WhatIf` is also read-only. `-Stage` accepts multiple stage names. A stage does not silently install all earlier prerequisites: complete Foundations before Toolchains, then Development after Toolchains and Apps. `-Apply` without `-Stage` executes all stages in the order above. Prefer separate stages for the first run.
 
