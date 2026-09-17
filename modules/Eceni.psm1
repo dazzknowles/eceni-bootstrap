@@ -52,6 +52,7 @@ function Get-EceniPlan {
         foreach ($setting in $settings.Registry) {
             $items.Add((New-EceniOperation 'Windows' 'Registry' $setting.Name "$($setting.Path) [$($setting.ValueName)] = $($setting.Value)" $setting))
         }
+        $items.Add((New-EceniOperation 'Windows' 'NetworkProfile' 'TheBatCave network is private' 'When connected to TheBatCave, set its Windows network category to Private' @{Name='TheBatCave';Category='Private'}))
         $items.Add((New-EceniOperation 'Windows' 'RemoteDesktop' 'Allow Remote Desktop connections' 'Enable RDP host access with Network Level Authentication and the built-in TCP/UDP firewall rules' @{
             RuleNames=@('RemoteDesktop-UserMode-In-TCP','RemoteDesktop-UserMode-In-UDP')
         }))
@@ -245,6 +246,25 @@ function Invoke-EceniAppx {
     }
     if (@(Get-AppxPackage -Name $Name -ErrorAction Stop | Where-Object Name -eq $Name).Count) { throw 'Package still present after removal.' }
     if ($changed) { return New-EceniResult 'Changed' 'Removed from current user; provisioned image and other accounts untouched.' }
+}
+
+function Set-EceniNetworkProfile {
+    param([hashtable]$Network)
+    $profiles = @(Get-NetConnectionProfile -Name $Network.Name -ErrorAction SilentlyContinue | Where-Object Name -eq $Network.Name)
+    if (-not $profiles.Count) { return New-EceniResult 'Skipped' "$($Network.Name) is not currently connected." }
+    if (@($profiles | Where-Object { $_.NetworkCategory.ToString() -eq 'DomainAuthenticated' }).Count) {
+        return New-EceniResult 'Warning' "$($Network.Name) is domain-authenticated; Windows owns that category and it was not changed."
+    }
+    $change = @($profiles | Where-Object { $_.NetworkCategory.ToString() -ne $Network.Category })
+    if (-not $change.Count) { return New-EceniResult 'AlreadyOK' "$($Network.Name) is already $($Network.Category)." }
+    foreach ($profile in $change) {
+        Set-NetConnectionProfile -InterfaceIndex $profile.InterfaceIndex -NetworkCategory $Network.Category -ErrorAction Stop
+    }
+    foreach ($profile in $change) {
+        $actual = Get-NetConnectionProfile -InterfaceIndex $profile.InterfaceIndex -ErrorAction Stop
+        if ($actual.NetworkCategory.ToString() -ne $Network.Category) { throw "Network category did not persist for interface $($profile.InterfaceIndex)." }
+    }
+    New-EceniResult 'Changed' "$($Network.Name) network category verified as $($Network.Category)."
 }
 
 function Invoke-EceniFeature {
@@ -555,6 +575,7 @@ function Invoke-EceniOperation {
         }
         'Registry' { return Set-EceniRegistry $Operation.Data $LogRoot }
         'Appx' { return Invoke-EceniAppx $Operation.Data.Name }
+        'NetworkProfile' { return Set-EceniNetworkProfile $Operation.Data }
         'Package' { return Invoke-EceniPackage $Operation.Data }
         'Uninstall' { return Invoke-EceniPackage $Operation.Data -Uninstall }
         'Symlink' { return Set-EceniSymlinkEvaluation }

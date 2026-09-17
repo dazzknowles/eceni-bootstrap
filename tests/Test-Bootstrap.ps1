@@ -33,6 +33,8 @@ Assert (@($plan | Where-Object { $_.Data.Id -eq 'Docker.DockerDesktop' }).Count 
 Assert (@($plan | Where-Object { $_.Data.Id -match 'MariaDB.*Server|MariaDB.Server|MSI.Center' }).Count -eq 0) 'No MariaDB server or MSI Center installer'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Appx' -and $_.Data.Name -match 'Solitaire|WindowsStore|DesktopAppInstaller' }).Count -eq 0) 'Solitaire, Store and App Installer are preserved'
 Assert (@($plan | Where-Object { $_.Name -eq 'NVIDIA App' -and $_.Stage -eq 'Apps' -and $_.Kind -eq 'Manual' -and $_.Data.Url -eq 'https://www.nvidia.com/en-gb/software/nvidia-app/' }).Count -eq 1) 'NVIDIA App is listed from the official vendor source'
+$batCave = @($plan | Where-Object { $_.Kind -eq 'NetworkProfile' -and $_.Data.Name -eq 'TheBatCave' -and $_.Data.Category -eq 'Private' })
+Assert ($batCave.Count -eq 1 -and (Get-EceniOperationContext $batCave[0]) -eq 'Machine') 'TheBatCave is conditionally configured as a private network in machine context'
 $profile.Options.PackageVersionLocks['Microsoft.PowerToys'] = '0.95.1'
 $lockedPackage = @(Get-EceniPlan $profile $root | Where-Object { $_.Data.Id -eq 'Microsoft.PowerToys' })
 Assert ($lockedPackage.Count -eq 1 -and $lockedPackage[0].Data.VersionLock -eq '0.95.1' -and $lockedPackage[0].Detail -match 'locked to 0\.95\.1') 'Profile version locks are attached to exact package operations'
@@ -230,6 +232,28 @@ Assert ($r.RebootRequired -and $r.Status -eq 'Skipped') 'Pending Windows feature
 & $module { $script:fakeFeatures = @([pscustomobject]@{FeatureName='VirtualMachinePlatform';State='Enabled'}) }
 $r = & $module { Invoke-EceniFeature @{Name='VirtualMachinePlatform';Enabled=$true} }
 Assert ($r.Status -eq 'AlreadyOK') 'Enabled WSL prerequisite is a no-op'
+
+# Network profile handling changes only an active exact-name match.
+& $module {
+    $script:fakeNetworkProfiles = @()
+    $script:networkWrites = 0
+    function script:Get-NetConnectionProfile {
+        param($Name,$InterfaceIndex,$ErrorAction)
+        if ($PSBoundParameters.ContainsKey('InterfaceIndex')) { return @($script:fakeNetworkProfiles | Where-Object InterfaceIndex -eq $InterfaceIndex) }
+        @($script:fakeNetworkProfiles | Where-Object Name -eq $Name)
+    }
+    function script:Set-NetConnectionProfile {
+        param($InterfaceIndex,$NetworkCategory,$ErrorAction)
+        foreach ($profile in $script:fakeNetworkProfiles | Where-Object InterfaceIndex -eq $InterfaceIndex) { $profile.NetworkCategory = $NetworkCategory }
+        $script:networkWrites++
+    }
+}
+$network = @{Name='TheBatCave';Category='Private'}
+$missing = & $module { param($n) Set-EceniNetworkProfile $n } $network
+& $module { $script:fakeNetworkProfiles = @([pscustomobject]@{Name='TheBatCave';InterfaceIndex=42;NetworkCategory='Public'}) }
+$changed = & $module { param($n) Set-EceniNetworkProfile $n } $network
+$same = & $module { param($n) Set-EceniNetworkProfile $n } $network
+Assert ($missing.Status -eq 'Skipped' -and $changed.Status -eq 'Changed' -and $same.Status -eq 'AlreadyOK' -and (& $module { $script:networkWrites }) -eq 1) 'TheBatCave network profile is skipped when disconnected and changed idempotently when connected'
 
 # Registry backups and idempotence using in-memory registry cmdlet mocks.
 & $module {

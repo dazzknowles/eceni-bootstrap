@@ -108,7 +108,7 @@ A lock pins a fresh bootstrap install to that version and makes the managed upda
 
 | Stage | Work |
 | --- | --- |
-| Windows | Exact current-user removal list; dark mode; Explorer preferences with desktop icons hidden; notification sounds off; hidden taskbar search/widgets/window-sharing; privacy/suggestions; download-and-notify Windows Update policy with the selected restart-notification controls; long paths; Developer Mode; Fast Startup off; Recall feature disabled; laptop power defaults |
+| Windows | Exact current-user removal list; dark mode; Explorer preferences with desktop icons hidden; notification sounds off; TheBatCave set Private when connected; hidden taskbar search/widgets/window-sharing; privacy/suggestions; download-and-notify Windows Update policy with the selected restart-notification controls; long paths; Developer Mode; Fast Startup off; Recall feature disabled; laptop power defaults |
 | Foundations | Source directory, PowerShell 7, Terminal, Git/LFS, GitHub CLI/Desktop, 1Password, AWS CLI v2 |
 | Toolchains | NVM plus Node 24 LTS, .NET 10 SDK, Python 3.14, uv, Temurin JDK 25 LTS, Go, Rust stable, C++ Build Tools and recommended SDK, CMake |
 | IDEs | VS Code and JetBrains Toolbox; all nine requested JetBrains products are listed for installation through Toolbox |
