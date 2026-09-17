@@ -1,0 +1,15 @@
+logs/
+dist/
+work/
+*.user.psd1
+*.eceni-*.bak
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials
+config.eceni-example
+init.*.ps1
+omp.cache
+*.omp.cache

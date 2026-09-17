@@ -1,0 +1,35 @@
+# Catwoman follow-up checklist
+
+These are intentional v0.1 manual/deferred items, not silently completed installs. Preview with `Bootstrap.ps1 -Stage Manual`; IDE, database and container follow-ups also appear with their own stages.
+
+## Codex first launch and UAC
+
+Finish Windows Update and driver installation, then reboot until Windows no longer reports an update or restart in progress **before launching Codex for the first time**. Codex creates its managed Windows sandbox accounts during first launch, and that one-time setup needs an administrator approval. Approve the prompt once and allow setup to finish; repeatedly pressing the setup control can queue duplicate attempts while Windows is still servicing the machine.
+
+If the prompt loops or setup appears stuck:
+
+1. Close Codex.
+2. Let Windows Update finish, including driver installs, and restart Windows.
+3. Open Codex again and allow the sandbox setup to resume.
+4. Run `codex doctor` in a normal terminal if Codex still reports that setup is incomplete.
+
+Do not disable UAC, lower its notification level, delete the Codex sandbox accounts, or keep reinstalling the Store app. Those actions do not resolve a pending Windows servicing operation. A completed setup normally leaves the `CodexSandboxUsers` local group and the managed `CodexSandboxOffline` and `CodexSandboxOnline` accounts in place for later launches.
+
+- [ ] In JetBrains Toolbox, sign in and install Rider, DataGrip, dotMemory, dotTrace, GoLand, WebStorm, PyCharm, IntelliJ IDEA and RustRover. Toolbox owns their updates and licensing.
+- [ ] Install [dbForge Studio for MySQL](https://www.devart.com/dbforge/mysql/studio/download.html) using your licence or chosen trial. The official installer supports `/verysilent`; v0.1 leaves vendor download/licensing interactive instead of guessing a package ID or unattended edition. No payment is made by this project.
+- [ ] Choose a WSL distro after the Containers stage and any requested reboot: `wsl --list --online`, then `wsl --install -d <exact-name>`. Ubuntu is simplest; Rocky is the existing server-family option. No distro was selected in Incubator III.
+- [ ] Install MariaDB **client** tools inside that distro (`sudo apt install mariadb-client` on Ubuntu, `sudo dnf install mariadb` on Rocky). Do not install a native Windows MariaDB server. DataGrip and dbForge supply GUI access.
+- [ ] Decide whether to enable Docker. It is off in `Catwoman.psd1`; set `Options.Docker = $true`, rerun Containers after WSL is ready, and complete Docker Desktop's first-run setup.
+- [ ] Install the current [ChatGPT Windows app](https://chatgpt.com/download/). The previously used Store ID `9NT1R1C2HH7J` is now labelled **ChatGPT Classic**, so v0.1 does not silently choose it.
+- [ ] Install the current [NVIDIA App](https://www.nvidia.com/en-gb/software/nvidia-app/) from NVIDIA's official download page. It is an Apps-stage manual item because no verified WinGet manifest is available.
+- [ ] Select the correct notebook GPU/Windows version at [NVIDIA Drivers](https://www.nvidia.com/en-gb/drivers/) and install the **Studio Driver**. Game Ready is not the baseline.
+- [ ] Keyboard lighting remains **TBD** until a lightweight alternative has been tested. Do not install MSI Center just for RGB.
+- [ ] Sign in to 1Password, GitHub, JetBrains, Claude/Claude Code, ChatGPT/Codex, Tailscale, Windscribe, Steam and Store apps as needed. Store entitlement/region or paid utility purchases remain interactive.
+- [ ] Set Git identity: `git config --global user.name "Your Name"` and `git config --global user.email "your chosen address"`. Run `gh auth login`. Git for Windows supplies Credential Manager; the bootstrap preserves its configured helper. Optionally generate a Catwoman-specific SSH key and add its public key to GitHub.
+- [ ] Review `.aws/config.eceni-example`; choose the region and add a `catwoman-bootstrap` AWS profile. Use `aws configure --profile catwoman-bootstrap` privately. Its access key should have permission only to read the intended Secrets Manager secret (and the specific KMS decrypt permission if required). Do not store the useful credentials, bootstrap key or private SSH keys in Git or the release ZIP. No SSO or paid infrastructure is provisioned.
+- [ ] Select Chrome as default browser and Windows Terminal as default terminal; choose PowerShell 7 as Terminal's default profile. Use a suitable font for Oh My Posh if you choose a glyph-heavy theme.
+- [ ] Pin `D:\Source` and `D:\Config` to Explorer Quick Access/Home. Choose `D:\Source` for GitHub Desktop clones and JetBrains project defaults. VS Code can open it directly; `csrc` opens it in PowerShell.
+- [ ] Check Update settings and policy behaviour on Catwoman. Keep restart notifications visible and perform manual updates/restarts. The original blanket no-automatic-reboot requirement cannot be guaranteed by the proposed policy pair; see POLICIES.md.
+- [ ] If Windows offers Edge's normal Uninstall action, use it if still desired. Do not force-remove WebView2/system components.
+- [ ] Launch applications once, then rerun ConfigLinks so newly created settings directories become available.
+- [ ] When Git/GitHub are working, initialize the eventual source repository. Never include `D:\Config`, credentials, local logs or test scratch data.
