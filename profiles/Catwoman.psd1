@@ -22,6 +22,11 @@
         GitAutoCrlf = 'input'
         AwsProfile = 'catwoman-bootstrap'
         AwsRegion = ''
+        TerminalProfiles = @{
+            Enabled = $true
+            CodexTabColor = '#10A37F'
+            ClaudeTabColor = '#D97757'
+        }
         # Add exact WinGet versions here to exclude packages from managed updates.
         # Example: 'Microsoft.PowerToys' = '0.95.1'
         PackageVersionLocks = @{}

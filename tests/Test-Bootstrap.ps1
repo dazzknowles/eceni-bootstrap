@@ -49,6 +49,8 @@ Assert (($stages -join ',') -eq 'Foundations,AI') 'Stage selection preserves can
 $packages = @($plan | Where-Object Kind -eq 'Package')
 Assert (@($packages | Group-Object Detail | Where-Object Count -gt 1).Count -eq 0) 'No duplicate package installs'
 Assert (@($plan | Where-Object { $_.Name -eq 'Keyboard lighting' -and $_.Kind -eq 'Manual' }).Count -eq 1) 'Keyboard lighting remains pending'
+Assert (@($plan | Where-Object { $_.Kind -eq 'TerminalProfiles' -and $_.Name -eq 'Codex and Claude Terminal profiles' }).Count -eq 1) 'Development includes managed Codex and Claude Windows Terminal profiles'
+Assert ((Get-EceniOperationContext ($plan | Where-Object Kind -eq 'TerminalProfiles')) -eq 'User') 'Windows Terminal profiles use normal user context'
 Assert ((Get-EceniOperationContext ($plan | Where-Object { $_.Name -eq 'Show file extensions' })) -eq 'User') 'HKCU settings use normal user context'
 $desktopIcons = @($plan | Where-Object { $_.Name -eq 'Desktop icons hidden' })
 Assert ($desktopIcons.Count -eq 1 -and $desktopIcons[0].Data.Path -eq 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -and $desktopIcons[0].Data.ValueName -eq 'HideIcons' -and $desktopIcons[0].Data.Value -eq 1) 'Desktop icons are hidden in the Windows plan'
@@ -217,6 +219,22 @@ $tokens=$null; $errors=$null
 Assert ($errors.Count -eq 0) 'Source directory with apostrophe is safely quoted in shell profile'
 Set-Content $shellFile '# BEGIN ECENI BOOTSTRAP'
 Assert-Throws { & $module { param($p,$d) Set-EceniShell $p -DocumentsDirectory $d } $profile $docs } 'Malformed existing managed block is preserved for inspection'
+
+# Terminal fragment creation preserves the main settings file and is stable on reruns.
+$terminalRoot = Join-Path $tmp 'terminal-fragments\Eceni'
+$iconRoot = Join-Path $tmp 'terminal-icons'
+New-Item -ItemType Directory -Path $iconRoot -Force | Out-Null
+$codexIcon = Join-Path $iconRoot 'codex.png'; [IO.File]::WriteAllBytes($codexIcon,[byte[]](1,2,3))
+$claudeIcon = Join-Path $iconRoot 'claude.png'; [IO.File]::WriteAllBytes($claudeIcon,[byte[]](4,5,6))
+$profile.SourceRoot = 'D:\Source'
+$a = & $module { param($p,$r,$i) Set-EceniTerminalProfiles $p -FragmentRoot $r -IconSources $i } $profile $terminalRoot @{Codex=$codexIcon;Claude=$claudeIcon}
+$b = & $module { param($p,$r,$i) Set-EceniTerminalProfiles $p -FragmentRoot $r -IconSources $i } $profile $terminalRoot @{Codex=$codexIcon;Claude=$claudeIcon}
+$terminalJson = Get-Content (Join-Path $terminalRoot 'profiles.json') -Raw | ConvertFrom-Json
+Assert ($a.Status -eq 'Changed' -and $b.Status -eq 'AlreadyOK') 'Windows Terminal fragment and icons are idempotent'
+Assert ($terminalJson.profiles.Count -eq 2 -and ($terminalJson.profiles.name -join ',') -eq 'Codex,Claude Code') 'Windows Terminal fragment defines both AI profiles'
+Assert ($terminalJson.profiles[0].startingDirectory -eq 'D:\Source' -and $terminalJson.profiles[0].tabColor -eq '#10A37F' -and $terminalJson.profiles[1].tabColor -eq '#D97757') 'Windows Terminal profiles use the configured source root and tab colours'
+Assert ($terminalJson.profiles[0].commandline -match 'codex' -and $terminalJson.profiles[1].commandline -match 'claude') 'Windows Terminal profiles launch the corresponding CLI'
+Assert ((Test-Path (Join-Path $terminalRoot 'codex.png')) -and (Test-Path (Join-Path $terminalRoot 'claude.png'))) 'Windows Terminal profile icons are stored beside the managed fragment'
 
 # Optional-feature state handling without DISM or rebooting.
 & $module {

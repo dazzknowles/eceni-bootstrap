@@ -116,7 +116,7 @@ A lock pins a fresh bootstrap install to that version and makes the managed upda
 | AI | Claude desktop and Claude Code; current ChatGPT desktop download is a manual step |
 | Apps | Termius, Oh My Posh, Notepad++, Steam, PowerToys, Chrome, EarTrumpet, Tailscale, Windscribe, Apple Music, WhatsApp, Paste File, Simple Screen Ruler; NVIDIA App via its official installer |
 | Containers | Machine-scoped symlink repair and WSL/Virtual Machine Platform features; user-scoped WSL2 default; distro chosen explicitly; Docker Desktop opt-in |
-| Development | Git defaults/LFS, PowerShell `csrc` navigation helper and Oh My Posh initialization, pnpm, Codex CLI, credential-free AWS profile example |
+| Development | Git defaults/LFS, PowerShell `csrc` navigation helper and Oh My Posh initialization, pnpm, Codex CLI, Codex/Claude Windows Terminal profiles, credential-free AWS profile example |
 | ConfigLinks | Flat navigation tree at `D:\Config`; directory junctions and file shortcuts; generated location/secrets index |
 | Manual | Sign-ins, defaults, NVIDIA Studio selection, keyboard-lighting TBD, Git identity, Quick Access, development-location preferences |
 
@@ -129,6 +129,8 @@ Edit `profiles/Catwoman.psd1`: paths, role selection, Node major, Docker toggle,
 `config/Windows.psd1` contains named registry preferences. `roles/*.psd1` contains package and manual entries. `modules/Eceni.psm1` implements the operations. To add another workstation, copy the profile and supply `-Profile .\profiles\Other.psd1`. Future Linux/server engines are an architectural extension, not a claim of v0.1 support.
 
 WinGet installations use exact IDs and, unless a profile lock is present, the current source release. Normal bootstrap reruns do not implicitly upgrade installed packages; `Update-Packages.ps1` is the explicit update path. Major-version package IDs bound .NET, Python and Java. NVM chooses an installed matching Node 24 version, or the latest 24.x LTS patch when absent. Existing stable Rust is retained. This is a repeatable desired-state baseline, **not a byte-for-byte locked image**. Global npm tools are per selected Node version; rerun Development after switching versions.
+
+The Development user-context pass adds separate **Codex** and **Claude Code** Windows Terminal profiles through an Eceni JSON fragment, leaving the main Terminal `settings.json` untouched. Both start in `SourceRoot`; their tab colours are configured under `Options.TerminalProfiles`. Where available, the official installed application icons are copied locally beside the fragment, with built-in glyph fallbacks when an application icon is not yet available. Rerun Development after installing or updating the desktop/CLI applications to refresh the icons.
 
 ## Results, reruns and recovery
 

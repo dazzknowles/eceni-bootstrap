@@ -35,6 +35,15 @@ function Import-EceniProfile {
         if ($entry.Key -notin $knownPackageIds) { throw "Version lock refers to an unknown package: $($entry.Key)" }
         if ([string]$entry.Value -notmatch '^[0-9A-Za-z][0-9A-Za-z._+-]*$') { throw "Unsafe version lock for $($entry.Key): $($entry.Value)" }
     }
+    if ($p.Options.ContainsKey('TerminalProfiles')) {
+        $terminal = $p.Options.TerminalProfiles
+        foreach ($key in 'Enabled','CodexTabColor','ClaudeTabColor') {
+            if (-not $terminal.ContainsKey($key)) { throw "TerminalProfiles is missing $key." }
+        }
+        foreach ($key in 'CodexTabColor','ClaudeTabColor') {
+            if ([string]$terminal[$key] -notmatch '^#[0-9A-Fa-f]{6}$') { throw "TerminalProfiles.$key must be a six-digit hex colour." }
+        }
+    }
     return $p
 }
 
@@ -90,7 +99,12 @@ function Get-EceniPlan {
         $items.Add((New-EceniOperation 'Development' 'Shell' 'PowerShell navigation and prompt' 'Append managed csrc/Oh My Posh block to PowerShell 7 profile; preserve existing content'))
         $items.Add((New-EceniOperation 'Development' 'Npm' 'pnpm' 'pnpm (current selected NVM Node)' @{Package='pnpm'}))
     }
-    if ($Profile.Roles -contains 'AIWorkstation') { $items.Add((New-EceniOperation 'Development' 'Npm' 'Codex CLI' '@openai/codex (current selected NVM Node)' @{Package='@openai/codex'})) }
+    if ($Profile.Roles -contains 'AIWorkstation') {
+        $items.Add((New-EceniOperation 'Development' 'Npm' 'Codex CLI' '@openai/codex (current selected NVM Node)' @{Package='@openai/codex'}))
+        if ($Profile.Options.ContainsKey('TerminalProfiles') -and $Profile.Options.TerminalProfiles.Enabled) {
+            $items.Add((New-EceniOperation 'Development' 'TerminalProfiles' 'Codex and Claude Terminal profiles' "Launch Codex and Claude Code in $($Profile.SourceRoot) with managed icons and tab colours"))
+        }
+    }
     $items.Add((New-EceniOperation 'Development' 'Aws' 'AWS profile scaffold' 'Example only; no credentials, region or secret ARN invented'))
     $items.Add((New-EceniOperation 'ConfigLinks' 'Links' 'Config navigation' "$($Profile.ConfigRoot): directory junctions, file shortcuts and a secrets-aware index"))
     $order = @('Windows','Foundations','Toolchains','IDEs','Database','AI','Apps','Containers','Development','ConfigLinks','Manual')
@@ -114,7 +128,7 @@ function Test-EceniAdministrator {
 function Get-EceniOperationContext {
     param($Operation)
     if ($Operation.Kind -eq 'Registry' -and $Operation.Data.Path -like 'HKCU:*') { return 'User' }
-    if ($Operation.Kind -in @('Appx','Wsl2','Git','Rust','Shell','Npm','Aws','Links')) { return 'User' }
+    if ($Operation.Kind -in @('Appx','Wsl2','Git','Rust','Shell','Npm','TerminalProfiles','Aws','Links')) { return 'User' }
     if ($Operation.Kind -in @('Package','Uninstall') -and $Operation.Data.ContainsKey('Scope') -and $Operation.Data.Scope -eq 'User') { return 'User' }
     if ($Operation.Kind -eq 'Manual') { return 'Any' }
     return 'Machine'
@@ -488,6 +502,81 @@ function Set-EceniShell {
     New-EceniResult 'Changed' 'PowerShell 7 profile updated; existing contents backed up.'
 }
 
+function Set-EceniTerminalProfiles {
+    param(
+        [hashtable]$Profile,
+        [string]$FragmentRoot = (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\Eceni'),
+        [hashtable]$IconSources = $null
+    )
+    $settings = $Profile.Options.TerminalProfiles
+    New-Item -ItemType Directory -Path $FragmentRoot -Force | Out-Null
+    $changed = $false
+
+    if ($null -eq $IconSources) {
+        $IconSources = @{}
+        $codexPackage = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($codexPackage) {
+            $candidate = Join-Path $codexPackage.InstallLocation 'Assets\Square44x44Logo.targetsize-32_altform-unplated.png'
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) { $IconSources.Codex = $candidate }
+        }
+        $claudeCommand = Get-Command 'claude.exe' -ErrorAction SilentlyContinue
+        if ($claudeCommand) { $IconSources.Claude = $claudeCommand.Source }
+    }
+
+    $codexIconPath = Join-Path $FragmentRoot 'codex.png'
+    if ($IconSources.Codex -and (Test-Path -LiteralPath $IconSources.Codex -PathType Leaf)) {
+        $bytes = $null
+        $bytes = [IO.File]::ReadAllBytes($IconSources.Codex)
+        $same = (Test-Path -LiteralPath $codexIconPath -PathType Leaf) -and
+            ([Convert]::ToBase64String([IO.File]::ReadAllBytes($codexIconPath)) -eq [Convert]::ToBase64String($bytes))
+        if (-not $same) { [IO.File]::WriteAllBytes($codexIconPath,$bytes); $changed=$true }
+    }
+
+    $claudeIconPath = Join-Path $FragmentRoot 'claude.png'
+    if ($IconSources.Claude -and (Test-Path -LiteralPath $IconSources.Claude -PathType Leaf)) {
+        $bytes = $null
+        if ([IO.Path]::GetExtension([string]$IconSources.Claude) -ieq '.png') {
+            $bytes = [IO.File]::ReadAllBytes($IconSources.Claude)
+        } else {
+            Add-Type -AssemblyName System.Drawing
+            $icon = [Drawing.Icon]::ExtractAssociatedIcon([string]$IconSources.Claude)
+            if ($icon) {
+                $bitmap = $icon.ToBitmap(); $stream = New-Object IO.MemoryStream
+                try { $bitmap.Save($stream,[Drawing.Imaging.ImageFormat]::Png); $bytes = $stream.ToArray() }
+                finally { $stream.Dispose(); $bitmap.Dispose(); $icon.Dispose() }
+            }
+        }
+        if ($bytes) {
+            $same = (Test-Path -LiteralPath $claudeIconPath -PathType Leaf) -and
+                ([Convert]::ToBase64String([IO.File]::ReadAllBytes($claudeIconPath)) -eq [Convert]::ToBase64String($bytes))
+            if (-not $same) { [IO.File]::WriteAllBytes($claudeIconPath,$bytes); $changed=$true }
+        }
+    }
+
+    $codexIcon = if (Test-Path -LiteralPath $codexIconPath -PathType Leaf) { $codexIconPath } else { [char]::ConvertFromUtf32(0x1F916) }
+    $claudeIcon = if (Test-Path -LiteralPath $claudeIconPath -PathType Leaf) { $claudeIconPath } else { [char]::ConvertFromUtf32(0x2726) }
+    $profiles = @(
+        [ordered]@{
+            name='Codex'; guid='{4a73bc20-f2c2-4d31-a71c-e32b58d6b50e}'
+            commandline='pwsh.exe -NoLogo -NoExit -Command codex'; startingDirectory=$Profile.SourceRoot
+            tabTitle='Codex'; tabColor=[string]$settings.CodexTabColor; icon=$codexIcon
+        },
+        [ordered]@{
+            name='Claude Code'; guid='{6d09b226-46a0-44e2-8393-67f0a6b15da0}'
+            commandline='pwsh.exe -NoLogo -NoExit -Command claude'; startingDirectory=$Profile.SourceRoot
+            tabTitle='Claude Code'; tabColor=[string]$settings.ClaudeTabColor; icon=$claudeIcon
+        }
+    )
+    $json = ([ordered]@{profiles=$profiles} | ConvertTo-Json -Depth 6) + "`r`n"
+    $fragmentPath = Join-Path $FragmentRoot 'profiles.json'
+    if (-not (Test-Path -LiteralPath $fragmentPath -PathType Leaf) -or [IO.File]::ReadAllText($fragmentPath) -ne $json) {
+        [IO.File]::WriteAllText($fragmentPath,$json,(New-Object Text.UTF8Encoding($false)))
+        $changed = $true
+    }
+    if ($changed) { return New-EceniResult 'Changed' 'Windows Terminal Codex and Claude Code profiles updated.' }
+    New-EceniResult 'AlreadyOK' 'Windows Terminal Codex and Claude Code profiles match.'
+}
+
 function Set-EceniAws {
     param([hashtable]$Profile)
     $folder = Join-Path $env:USERPROFILE '.aws'
@@ -594,6 +683,7 @@ function Invoke-EceniOperation {
         'VCWorkload' { return Set-EceniVCWorkload }
         'Npm' { return Set-EceniNpm $Operation.Data.Package }
         'Shell' { return Set-EceniShell $Profile }
+        'TerminalProfiles' { return Set-EceniTerminalProfiles $Profile }
         'Aws' { return Set-EceniAws $Profile }
         'Links' { return Set-EceniLinks $Profile }
         default { throw "Unsupported operation: $($Operation.Kind)" }
