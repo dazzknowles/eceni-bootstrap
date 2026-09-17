@@ -60,6 +60,8 @@ $desktopIcons = @($plan | Where-Object { $_.Name -eq 'Desktop icons hidden' })
 Assert ($desktopIcons.Count -eq 1 -and $desktopIcons[0].Data.Path -eq 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -and $desktopIcons[0].Data.ValueName -eq 'HideIcons' -and $desktopIcons[0].Data.Value -eq 1) 'Desktop icons are hidden in the Windows plan'
 $notificationSound = @($plan | Where-Object { $_.Name -eq 'Notification sounds off' })
 Assert ($notificationSound.Count -eq 1 -and $notificationSound[0].Data.Path -eq 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings' -and $notificationSound[0].Data.ValueName -eq 'NOC_GLOBAL_SETTING_ALLOW_NOTIFICATION_SOUND' -and $notificationSound[0].Data.Value -eq 0) 'Notification sounds are disabled in the Windows plan'
+$noSounds = @($plan | Where-Object { $_.Kind -eq 'SoundScheme' -and $_.Name -eq 'Windows sound scheme: No Sounds' })
+Assert ($noSounds.Count -eq 1 -and (Get-EceniOperationContext $noSounds[0]) -eq 'User') 'The complete No Sounds scheme is applied in user context'
 $updatePolicyValues = @{
     'AUOptions' = 3
     'NoAutoUpdate' = 0
@@ -278,6 +280,46 @@ Assert ((& $module { $script:rockyDownloads }) -eq 2) 'Rocky WSL downloads one i
 Assert (@($rockyCalls | Where-Object { $_.Arguments[0] -eq '--install' -and '--from-file' -in $_.Arguments -and '--no-launch' -in $_.Arguments -and '2' -in $_.Arguments }).Count -eq 1) 'Rocky WSL uses the modern file installer as WSL2 without launching OOBE'
 Assert ((& $module { $script:rockyDefault }) -eq 'RockyLinux-10') 'Rocky Linux is made the default WSL distribution'
 Assert (-not (Test-Path (Join-Path $rockyCache 'Rocky-10-WSL-Base.latest.x86_64.wsl'))) 'Verified Rocky installer cache is removed after successful registration'
+
+# Restore the real module functions before the remaining isolated mocks.
+Import-Module (Join-Path $root 'modules\Eceni.psm1') -Force
+$module = Get-Module Eceni
+
+# The No Sounds scheme clears active event mappings and logs only changed values.
+$soundLog = Join-Path $tmp 'sound-logs'
+New-Item -ItemType Directory -Path $soundLog -Force | Out-Null
+& $module {
+    $script:soundValues = @{
+        'HKCU:\AppEvents\Schemes' = '.Default'
+        'HKCU:\AppEvents\Schemes\Apps\.Default\DeviceConnect\.Current' = 'C:\Windows\media\Windows Hardware Insert.wav'
+        'HKCU:\AppEvents\Schemes\Apps\.Default\Silent\.Current' = ''
+    }
+    function script:Get-ChildItem {
+        param($LiteralPath,[switch]$Recurse,$ErrorAction)
+        @($script:soundValues.Keys | Where-Object { $_ -like '*\.Current' } | ForEach-Object { [pscustomobject]@{PSPath=$_;PSChildName='.Current'} })
+    }
+    function script:Get-ItemProperty {
+        param($LiteralPath,$ErrorAction)
+        if (-not $script:soundValues.ContainsKey([string]$LiteralPath)) { return $null }
+        $item = [pscustomobject]@{}
+        $item | Add-Member -NotePropertyName '(default)' -NotePropertyValue $script:soundValues[[string]$LiteralPath]
+        $item
+    }
+    function script:Test-Path { param($LiteralPath,$PathType) $script:soundValues.ContainsKey([string]$LiteralPath) }
+    function script:New-Item { param($Path,[switch]$Force) $script:soundValues[[string]$Path]=''; [pscustomobject]@{} }
+    function script:New-ItemProperty {
+        param($LiteralPath,$Name,$Value,$PropertyType,[switch]$Force)
+        $script:soundValues[[string]$LiteralPath]=[string]$Value
+    }
+    function script:Get-ItemPropertyValue { param($LiteralPath,$Name) $script:soundValues[[string]$LiteralPath] }
+}
+$a = & $module { param($l) Set-EceniNoSoundsScheme $l } $soundLog
+$b = & $module { param($l) Set-EceniNoSoundsScheme $l } $soundLog
+$soundBackups = @(Get-Content (Join-Path $soundLog 'registry-before.jsonl') | ForEach-Object { $_ | ConvertFrom-Json })
+Assert ($a.Status -eq 'Changed' -and $b.Status -eq 'AlreadyOK') 'No Sounds scheme application is idempotent'
+Assert ((& $module { $script:soundValues['HKCU:\AppEvents\Schemes'] }) -eq '.None') 'No Sounds becomes the selected Windows sound scheme'
+Assert ((& $module { $script:soundValues.Values | Where-Object { $_ -like '*.wav' } }).Count -eq 0) 'All active Windows event sound mappings are cleared'
+Assert ($soundBackups.Count -eq 2 -and @($soundBackups | Where-Object Existed).Count -eq 2) 'Changed sound scheme values are recorded before modification'
 
 # Restore the real module functions before the remaining isolated mocks.
 Import-Module (Join-Path $root 'modules\Eceni.psm1') -Force

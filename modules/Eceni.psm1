@@ -69,6 +69,7 @@ function Get-EceniPlan {
         foreach ($setting in $settings.Registry) {
             $items.Add((New-EceniOperation 'Windows' 'Registry' $setting.Name "$($setting.Path) [$($setting.ValueName)] = $($setting.Value)" $setting))
         }
+        $items.Add((New-EceniOperation 'Windows' 'SoundScheme' 'Windows sound scheme: No Sounds' 'Select the built-in No Sounds scheme and clear active Windows event sound mappings'))
         $items.Add((New-EceniOperation 'Windows' 'NetworkProfile' 'TheBatCave network is private' 'When connected to TheBatCave, set its Windows network category to Private' @{Name='TheBatCave';Category='Private'}))
         $items.Add((New-EceniOperation 'Windows' 'RemoteDesktop' 'Allow Remote Desktop connections' 'Enable RDP host access with Network Level Authentication and the built-in TCP/UDP firewall rules' @{
             RuleNames=@('RemoteDesktop-UserMode-In-TCP','RemoteDesktop-UserMode-In-UDP')
@@ -144,7 +145,7 @@ function Test-EceniAdministrator {
 function Get-EceniOperationContext {
     param($Operation)
     if ($Operation.Kind -eq 'Registry' -and $Operation.Data.Path -like 'HKCU:*') { return 'User' }
-    if ($Operation.Kind -in @('Appx','Wsl2','WslDistro','Git','Rust','Shell','Npm','TerminalProfiles','Aws','Links')) { return 'User' }
+    if ($Operation.Kind -in @('Appx','SoundScheme','Wsl2','WslDistro','Git','Rust','Shell','Npm','TerminalProfiles','Aws','Links')) { return 'User' }
     if ($Operation.Kind -in @('Package','Uninstall') -and $Operation.Data.ContainsKey('Scope') -and $Operation.Data.Scope -eq 'User') { return 'User' }
     if ($Operation.Kind -eq 'Manual') { return 'Any' }
     return 'Machine'
@@ -262,6 +263,43 @@ function Set-EceniRegistry {
     $actual = Get-ItemPropertyValue -LiteralPath $Setting.Path -Name $Setting.ValueName
     if ($actual -ne $Setting.Value) { throw 'Registry write did not persist.' }
     New-EceniResult 'Changed' 'Registry value verified; policy effectiveness depends on Windows edition/build.'
+}
+
+function Set-EceniNoSoundsScheme {
+    param([string]$LogRoot)
+    $schemePath = 'HKCU:\AppEvents\Schemes'
+    $appsPath = Join-Path $schemePath 'Apps'
+    $changes = New-Object 'System.Collections.Generic.List[object]'
+    $eventChanges = 0
+
+    $scheme = Get-ItemProperty -LiteralPath $schemePath -ErrorAction SilentlyContinue
+    $schemeProperty = if ($scheme) { $scheme.PSObject.Properties['(default)'] } else { $null }
+    if (-not $schemeProperty -or [string]$schemeProperty.Value -ne '.None') {
+        $changes.Add([pscustomobject]@{Path=$schemePath;Value='.None';Existing=$schemeProperty})
+    }
+    foreach ($key in @(Get-ChildItem -LiteralPath $appsPath -Recurse -ErrorAction SilentlyContinue | Where-Object PSChildName -eq '.Current')) {
+        $current = Get-ItemProperty -LiteralPath $key.PSPath -ErrorAction SilentlyContinue
+        $property = if ($current) { $current.PSObject.Properties['(default)'] } else { $null }
+        if ($property -and [string]$property.Value) {
+            $changes.Add([pscustomobject]@{Path=$key.PSPath;Value='';Existing=$property})
+            $eventChanges++
+        }
+    }
+    if (-not $changes.Count) { return New-EceniResult 'AlreadyOK' 'The No Sounds scheme is selected and active event sounds are empty.' }
+
+    foreach ($change in $changes) {
+        $backup = [ordered]@{
+            Time=[DateTime]::UtcNow.ToString('o');Path=$change.Path;Name='(default)'
+            Existed=($null -ne $change.Existing);Value=$null;Kind=$null
+        }
+        if ($change.Existing) { $backup.Value=$change.Existing.Value; $backup.Kind='String' }
+        $backup | ConvertTo-Json -Compress | Add-Content -LiteralPath (Join-Path $LogRoot 'registry-before.jsonl') -Encoding UTF8
+        if (-not (Test-Path -LiteralPath $change.Path)) { New-Item -Path $change.Path -Force | Out-Null }
+        New-ItemProperty -LiteralPath $change.Path -Name '(default)' -Value $change.Value -PropertyType String -Force | Out-Null
+        $actual = Get-ItemPropertyValue -LiteralPath $change.Path -Name '(default)'
+        if ([string]$actual -ne $change.Value) { throw "Sound scheme registry write did not persist: $($change.Path)" }
+    }
+    New-EceniResult 'Changed' "Selected No Sounds and cleared $eventChanges active Windows event sound mappings."
 }
 
 function Invoke-EceniAppx {
@@ -761,6 +799,7 @@ function Invoke-EceniOperation {
             return New-EceniResult 'Changed' 'Directory created.'
         }
         'Registry' { return Set-EceniRegistry $Operation.Data $LogRoot }
+        'SoundScheme' { return Set-EceniNoSoundsScheme $LogRoot }
         'Appx' { return Invoke-EceniAppx $Operation.Data.Name }
         'NetworkProfile' { return Set-EceniNetworkProfile $Operation.Data }
         'Package' { return Invoke-EceniPackage $Operation.Data }
