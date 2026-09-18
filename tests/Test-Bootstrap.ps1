@@ -58,6 +58,9 @@ Assert ((Get-EceniOperationContext $rockyWsl[0]) -eq 'User') 'Rocky WSL registra
 Assert (@($plan | Where-Object Name -eq 'WSL distribution').Count -eq 0) 'Configured Rocky installation replaces the obsolete choose-a-distro follow-up'
 Assert (@($plan | Where-Object { $_.Kind -eq 'TerminalProfiles' -and $_.Name -eq 'Codex and Claude Terminal profiles' }).Count -eq 1) 'Development includes managed Codex and Claude Windows Terminal profiles'
 Assert ((Get-EceniOperationContext ($plan | Where-Object Kind -eq 'TerminalProfiles')) -eq 'User') 'Windows Terminal profiles use normal user context'
+$gitPlan = @($plan | Where-Object { $_.Kind -eq 'Git' -and $_.Name -eq 'Configure Git and LFS' })
+Assert ($gitPlan.Count -eq 1 -and $gitPlan[0].Detail -match 'Dazz Knowles <me@dazzknowles\.co\.uk>') 'Development configures the requested global Git identity'
+Assert (@($plan | Where-Object { $_.Kind -eq 'Manual' -and $_.Name -eq 'Git identity and authentication' }).Count -eq 0) 'Configured Git identity is no longer a manual follow-up'
 Assert ((Get-EceniOperationContext ($plan | Where-Object { $_.Name -eq 'Show file extensions' })) -eq 'User') 'HKCU settings use normal user context'
 $desktopIcons = @($plan | Where-Object { $_.Name -eq 'Desktop icons hidden' })
 Assert ($desktopIcons.Count -eq 1 -and $desktopIcons[0].Data.Path -eq 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -and $desktopIcons[0].Data.ValueName -eq 'HideIcons' -and $desktopIcons[0].Data.Value -eq 1) 'Desktop icons are hidden in the Windows plan'
@@ -181,6 +184,38 @@ Assert-Throws { & $module { Assert-EceniPackageManager } } 'Broken WinGet is cau
 Queue-Result 0 'v1.12.350'
 & $module { Assert-EceniPackageManager }
 Assert $true 'Working WinGet passes preflight'
+
+# Git defaults and the requested identity are written globally and converge.
+& $module {
+    $script:gitSettings = @{}
+    $script:gitCalls = New-Object 'System.Collections.Generic.List[object]'
+    function script:Invoke-EceniNative {
+        param([string]$File,[string[]]$Arguments)
+        $script:gitCalls.Add(@{File=$File;Arguments=$Arguments})
+        if ($File -ne 'git.exe') { return [pscustomobject]@{Code=0;Output=''} }
+        if ($Arguments[0] -eq 'config' -and $Arguments[2] -eq '--get') {
+            $key = $Arguments[3]
+            if ($script:gitSettings.ContainsKey($key)) { return [pscustomobject]@{Code=0;Output=$script:gitSettings[$key]} }
+            return [pscustomobject]@{Code=1;Output=''}
+        }
+        if ($Arguments[0] -eq 'config') {
+            $script:gitSettings[$Arguments[2]] = $Arguments[3]
+            return [pscustomobject]@{Code=0;Output=''}
+        }
+        if ($Arguments[0] -eq 'lfs') {
+            $script:gitSettings['filter.lfs.process'] = 'git-lfs filter-process'
+            return [pscustomobject]@{Code=0;Output=''}
+        }
+        [pscustomobject]@{Code=0;Output=''}
+    }
+}
+$a = & $module { param($o) Set-EceniGit $o } $profile.Options
+$b = & $module { param($o) Set-EceniGit $o } $profile.Options
+$gitState = & $module { $script:gitSettings.Clone() }
+$gitCalls = & $module { $script:gitCalls.ToArray() }
+Assert ($a.Status -eq 'Changed' -and $b.Status -eq 'AlreadyOK') 'Managed Git configuration is idempotent'
+Assert ($gitState['user.name'] -eq 'Dazz Knowles' -and $gitState['user.email'] -eq 'me@dazzknowles.co.uk') 'Requested Git name and email are configured exactly'
+Assert (@($gitCalls | Where-Object { $_.Arguments[0] -eq 'config' -and $_.Arguments[1] -ne '--global' }).Count -eq 0) 'Managed Git settings use the current user global config'
 
 # Filesystem behaviour tested only under this project's work directory.
 Import-Module (Join-Path $root 'modules\Eceni.psm1') -Force

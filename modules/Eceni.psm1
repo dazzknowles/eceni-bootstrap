@@ -24,6 +24,12 @@ function Import-EceniProfile {
         if ($name -match '[*?\[\]]' -or $name -in $p.Keep -or $name -match 'Solitaire|WindowsStore|DesktopAppInstaller|WebView') { throw "Unsafe removal entry: $name" }
     }
     if ($p.Options.NodeMajor -notmatch '^\d+$') { throw 'NodeMajor must be a numeric LTS major.' }
+    foreach ($key in 'GitUserName','GitUserEmail') {
+        if ($p.Options.ContainsKey($key) -and ([string]::IsNullOrWhiteSpace([string]$p.Options[$key]) -or [string]$p.Options[$key] -match '[\r\n]')) {
+            throw "$key must be a non-empty single-line value."
+        }
+    }
+    if ($p.Options.ContainsKey('GitUserName') -xor $p.Options.ContainsKey('GitUserEmail')) { throw 'GitUserName and GitUserEmail must be configured together.' }
     if ($p.Options.ContainsKey('RockyWsl')) {
         $rocky = $p.Options.RockyWsl
         foreach ($key in 'Enabled','Major','DistroName','SetDefault') {
@@ -112,7 +118,8 @@ function Get-EceniPlan {
             $items.Add((New-EceniOperation 'Containers' 'WslDistro' "Install Rocky Linux $($rocky.Major) for WSL" "Download the official checksum-verified WSL image and register it as $($rocky.DistroName)" $rocky))
             $items.Add((New-EceniOperation 'Containers' 'Manual' 'Finish Rocky Linux first launch' "Launch $($rocky.DistroName) once and choose its Linux username and password."))
         }
-        $items.Add((New-EceniOperation 'Development' 'Git' 'Configure Git and LFS' "Default branch main; long paths; autocrlf=$($Profile.Options.GitAutoCrlf); LFS filters"))
+        $gitIdentity = if ($Profile.Options.ContainsKey('GitUserName')) { "; identity=$($Profile.Options.GitUserName) <$($Profile.Options.GitUserEmail)>" } else { '; identity preserved' }
+        $items.Add((New-EceniOperation 'Development' 'Git' 'Configure Git and LFS' "Default branch main; long paths; autocrlf=$($Profile.Options.GitAutoCrlf); LFS filters$gitIdentity"))
         $items.Add((New-EceniOperation 'Development' 'Shell' 'PowerShell navigation and prompt' 'Append managed csrc/Oh My Posh block to PowerShell 7 profile; preserve existing content'))
         $items.Add((New-EceniOperation 'Development' 'Npm' 'pnpm' 'pnpm (current selected NVM Node)' @{Package='pnpm'}))
     }
@@ -523,11 +530,20 @@ function Install-EceniRockyWsl {
 function Set-EceniGit {
     param([hashtable]$Options)
     $changed = $false
-    foreach ($pair in @(@('init.defaultBranch','main'),@('core.longpaths','true'),@('core.autocrlf',$Options.GitAutoCrlf))) {
-        $r = Invoke-EceniNative 'git.exe' @('config','--global','--get',$pair[0])
+    $settings = [ordered]@{
+        'init.defaultBranch' = 'main'
+        'core.longpaths' = 'true'
+        'core.autocrlf' = $Options.GitAutoCrlf
+    }
+    if ($Options.ContainsKey('GitUserName')) {
+        $settings['user.name'] = $Options.GitUserName
+        $settings['user.email'] = $Options.GitUserEmail
+    }
+    foreach ($name in $settings.Keys) {
+        $r = Invoke-EceniNative 'git.exe' @('config','--global','--get',$name)
         if ($r.Code -notin @(0,1)) { Assert-EceniNativeSuccess $r 'Read Git setting' }
-        if ($r.Code -ne 0 -or $r.Output.Trim() -ne $pair[1]) {
-            $r = Invoke-EceniNative 'git.exe' @('config','--global',$pair[0],$pair[1]); Assert-EceniNativeSuccess $r 'Write Git setting'; $changed = $true
+        if ($r.Code -ne 0 -or $r.Output.Trim() -ne $settings[$name]) {
+            $r = Invoke-EceniNative 'git.exe' @('config','--global',$name,$settings[$name]); Assert-EceniNativeSuccess $r 'Write Git setting'; $changed = $true
         }
     }
     $r = Invoke-EceniNative 'git.exe' @('config','--global','--get','filter.lfs.process')
@@ -535,7 +551,7 @@ function Set-EceniGit {
     if ($r.Output.Trim() -ne 'git-lfs filter-process') {
         $r = Invoke-EceniNative 'git.exe' @('lfs','install','--skip-repo'); Assert-EceniNativeSuccess $r 'Configure Git LFS'; $changed = $true
     }
-    if ($changed) { return New-EceniResult 'Changed' 'Git defaults and LFS set; identity/credential helper preserved.' }
+    if ($changed) { return New-EceniResult 'Changed' "Git defaults and LFS set$(if ($Options.ContainsKey('GitUserName')) { '; user identity configured' } else { '; identity preserved' }); credential helper preserved." }
     New-EceniResult 'AlreadyOK' 'Git configuration matches.'
 }
 

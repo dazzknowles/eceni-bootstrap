@@ -123,9 +123,9 @@ A lock pins a fresh bootstrap install to that version and makes the managed upda
 | AI | Claude desktop and Claude Code; current ChatGPT desktop download is a manual step |
 | Apps | Termius, Oh My Posh, Notepad++, CopyQ, Steam, PowerToys, Chrome, Google Drive for desktop, EarTrumpet, Tailscale, Windscribe, NVIDIA App, Apple Music, WhatsApp, Paste File and Simple Screen Ruler; Store apps use their verified product IDs |
 | Containers | Machine-scoped symlink repair and WSL/Virtual Machine Platform features; user-scoped WSL2 default; checksum-verified Rocky Linux 10 WSL image, registered as the default distro; Docker Desktop opt-in |
-| Development | Git defaults/LFS, PowerShell `csrc` navigation helper and Oh My Posh initialization, pnpm, Codex CLI, Codex/Claude Windows Terminal profiles, credential-free AWS profile example |
+| Development | Git defaults/LFS and global identity for Dazz Knowles, PowerShell `csrc` navigation helper and Oh My Posh initialization, pnpm, Codex CLI, Codex/Claude Windows Terminal profiles, credential-free AWS profile example |
 | ConfigLinks | Flat navigation tree at `D:\Config`; directory junctions and file shortcuts; generated location/secrets index |
-| Manual | Sign-ins, defaults, NVIDIA Studio selection, keyboard-lighting TBD, Git identity, Quick Access, development-location preferences |
+| Manual | Sign-ins, defaults, NVIDIA Studio selection, keyboard-lighting TBD, Quick Access, development-location preferences |
 
 The exact package manifest lives in `roles/`. Every item from the discussion is either implemented or explicitly listed in [the follow-up checklist](docs/POST-INSTALL.md). No MariaDB server, MSI Center, Office install/removal, or old context-menu hack is included. Solitaire, Calculator, Photos, Paint, Snipping Tool, Camera, Store and App Installer stay. Edge/WebView2 remain unless Windows offers a supported Edge uninstall.
 

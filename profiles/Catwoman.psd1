@@ -26,6 +26,8 @@
         SleepMinutesAC = 60
         SleepMinutesDC = 20
         GitAutoCrlf = 'input'
+        GitUserName = 'Dazz Knowles'
+        GitUserEmail = 'me@dazzknowles.co.uk'
         AwsProfile = 'catwoman-bootstrap'
         AwsRegion = ''
         TerminalProfiles = @{

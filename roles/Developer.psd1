@@ -143,12 +143,6 @@
             Url = 'https://www.jetbrains.com/toolbox-app/'
         }
         @{
-            Name = 'Git identity and authentication'
-            Stage = 'Manual'
-            Instructions = 'Set git config --global user.name and user.email; run gh auth login. Create a separate SSH key if wanted; never commit private keys.'
-            Url = ''
-        }
-        @{
             Name = 'Development locations'
             Stage = 'Manual'
             Instructions = 'Use D:\Source in GitHub Desktop clone dialogs and JetBrains new-project defaults. The shell gets a csrc helper; existing preferences are not overwritten.'
