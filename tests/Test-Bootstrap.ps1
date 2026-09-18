@@ -33,6 +33,7 @@ Assert (@($plan | Where-Object { $_.Data.Id -eq 'Docker.DockerDesktop' }).Count 
 Assert (@($plan | Where-Object { $_.Data.Id -match 'MariaDB.*Server|MariaDB.Server|MSI.Center' }).Count -eq 0) 'No MariaDB server or MSI Center installer'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Appx' -and $_.Data.Name -match 'Solitaire|WindowsStore|DesktopAppInstaller' }).Count -eq 0) 'Solitaire, Store and App Installer are preserved'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Package' -and $_.Data.Id -eq 'hluk.CopyQ' -and $_.Stage -eq 'Apps' }).Count -eq 1) 'CopyQ is included in the Apps stage'
+Assert (@($plan | Where-Object { $_.Kind -eq 'Package' -and $_.Data.Id -eq 'Google.GoogleDrive' -and $_.Stage -eq 'Apps' }).Count -eq 1) 'Google Drive for desktop is included in the Apps stage'
 $nvidiaApp = @($plan | Where-Object { $_.Name -eq 'Install NVIDIA App' -and $_.Stage -eq 'Apps' -and $_.Kind -eq 'Package' -and $_.Data.Id -eq 'XP8CLZL93F5Z4P' -and $_.Data.Source -eq 'msstore' })
 Assert ($nvidiaApp.Count -eq 1 -and (Get-EceniOperationContext $nvidiaApp[0]) -eq 'User') 'NVIDIA App uses its Microsoft Store product ID in user context'
 $batCave = @($plan | Where-Object { $_.Kind -eq 'NetworkProfile' -and $_.Data.Name -eq 'TheBatCave' -and $_.Data.Category -eq 'Private' })

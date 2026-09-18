@@ -50,6 +50,13 @@
             Stage = 'Apps'
         }
         @{
+            Name = 'Google Drive for desktop'
+            Id = 'Google.GoogleDrive'
+            Type = 'WinGet'
+            Source = 'winget'
+            Stage = 'Apps'
+        }
+        @{
             Name = 'EarTrumpet'
             Id = 'File-New-Project.EarTrumpet'
             Type = 'WinGet'
