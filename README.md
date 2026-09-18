@@ -39,12 +39,13 @@ The actual context split is:
 | Windows | User and Machine |
 | Foundations | Machine |
 | Toolchains | Machine and User |
-| IDEs, Database, AI, Apps | Machine, plus displayed manual items where applicable |
+| IDEs, Database, AI | Machine, plus displayed manual items where applicable |
+| Apps | Machine and User |
 | Containers | Machine and User |
 | Development, ConfigLinks | User |
 | Manual | Read-only follow-up list |
 
-Continue one stage at a time when running `Bootstrap.ps1` directly. Run Windows, Toolchains and Containers in both contexts. Containers must run its machine work before its user work: symlink evaluation and WSL features are machine-scoped, while setting WSL2 as the default and registering Rocky Linux are user-scoped. After a reboot request, reboot yourself and rerun that stage. Open a fresh terminal after foundations or runtime installs if PATH still needs refreshing.
+Continue one stage at a time when running `Bootstrap.ps1` directly. Run Windows, Toolchains, Apps and Containers in both contexts. The Apps user pass installs the Microsoft Store NVIDIA App with the desktop user's Store identity. Containers must run its machine work before its user work: symlink evaluation and WSL features are machine-scoped, while setting WSL2 as the default and registering Rocky Linux are user-scoped. After a reboot request, reboot yourself and rerun that stage. Open a fresh terminal after foundations or runtime installs if PATH still needs refreshing.
 
 On a fresh Windows installation, finish Windows Update and driver installation and clear all pending restarts before Codex's first launch. Its one-time sandbox setup requests administrator approval and can loop if Windows is still servicing the machine. Recovery steps are in [the follow-up checklist](docs/POST-INSTALL.md#codex-first-launch-and-uac).
 
@@ -54,7 +55,8 @@ On a fresh Windows installation, finish Windows Update and driver installation a
 .\Bootstrap.ps1 -Apply -Stage IDEs
 .\Bootstrap.ps1 -Apply -Stage Database
 .\Bootstrap.ps1 -Apply -Stage AI
-.\Bootstrap.ps1 -Apply -Stage Apps
+.\Bootstrap.ps1 -Apply -Stage Apps -Context Machine       # administrator window
+.\Bootstrap.ps1 -Apply -Stage Apps -Context User          # normal window; includes NVIDIA App
 .\Bootstrap.ps1 -Apply -Stage Containers -Context Machine   # administrator window; reboot if requested
 .\Bootstrap.ps1 -Apply -Stage Containers -Context User      # normal window, after any reboot
 wsl -d RockyLinux-10                                        # first launch: choose Linux username/password
@@ -97,7 +99,7 @@ Run the updates from a normal PowerShell window:
 .\tools\Update-Packages.ps1 -Apply
 ```
 
-The updater requests elevation only for machine-scoped packages, processes each exact ID separately, uses silent/non-interactive WinGet flags, never uses `--force`, and stops when a reboot is required. It does not update manual installations such as NVIDIA App, ChatGPT, dbForge or Toolbox-managed IDEs; use those vendors' own update mechanisms. Store and vendor self-updaters can also operate independently of this script.
+The updater requests elevation only for machine-scoped packages, processes each exact ID separately, uses silent/non-interactive WinGet flags, never uses `--force`, and stops when a reboot is required. It does not update manual installations such as ChatGPT, dbForge or Toolbox-managed IDEs; use those vendors' own update mechanisms. Store and vendor self-updaters can also operate independently of this script.
 
 To lock a managed package, add its exact WinGet ID and exact version to `Options.PackageVersionLocks` in `profiles\Catwoman.psd1`:
 
@@ -119,7 +121,7 @@ A lock pins a fresh bootstrap install to that version and makes the managed upda
 | IDEs | VS Code and JetBrains Toolbox; all nine requested JetBrains products are listed for installation through Toolbox |
 | Database | SSMS 22 and Bruno; explicit dbForge and MariaDB-client follow-up |
 | AI | Claude desktop and Claude Code; current ChatGPT desktop download is a manual step |
-| Apps | Termius, Oh My Posh, Notepad++, CopyQ, Steam, PowerToys, Chrome, EarTrumpet, Tailscale, Windscribe, Apple Music, WhatsApp, Paste File, Simple Screen Ruler; NVIDIA App via its official installer |
+| Apps | Termius, Oh My Posh, Notepad++, CopyQ, Steam, PowerToys, Chrome, EarTrumpet, Tailscale, Windscribe, NVIDIA App, Apple Music, WhatsApp, Paste File and Simple Screen Ruler; Store apps use their verified product IDs |
 | Containers | Machine-scoped symlink repair and WSL/Virtual Machine Platform features; user-scoped WSL2 default; checksum-verified Rocky Linux 10 WSL image, registered as the default distro; Docker Desktop opt-in |
 | Development | Git defaults/LFS, PowerShell `csrc` navigation helper and Oh My Posh initialization, pnpm, Codex CLI, Codex/Claude Windows Terminal profiles, credential-free AWS profile example |
 | ConfigLinks | Flat navigation tree at `D:\Config`; directory junctions and file shortcuts; generated location/secrets index |

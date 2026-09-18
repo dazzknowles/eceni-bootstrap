@@ -33,7 +33,8 @@ Assert (@($plan | Where-Object { $_.Data.Id -eq 'Docker.DockerDesktop' }).Count 
 Assert (@($plan | Where-Object { $_.Data.Id -match 'MariaDB.*Server|MariaDB.Server|MSI.Center' }).Count -eq 0) 'No MariaDB server or MSI Center installer'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Appx' -and $_.Data.Name -match 'Solitaire|WindowsStore|DesktopAppInstaller' }).Count -eq 0) 'Solitaire, Store and App Installer are preserved'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Package' -and $_.Data.Id -eq 'hluk.CopyQ' -and $_.Stage -eq 'Apps' }).Count -eq 1) 'CopyQ is included in the Apps stage'
-Assert (@($plan | Where-Object { $_.Name -eq 'NVIDIA App' -and $_.Stage -eq 'Apps' -and $_.Kind -eq 'Manual' -and $_.Data.Url -eq 'https://www.nvidia.com/en-gb/software/nvidia-app/' }).Count -eq 1) 'NVIDIA App is listed from the official vendor source'
+$nvidiaApp = @($plan | Where-Object { $_.Name -eq 'Install NVIDIA App' -and $_.Stage -eq 'Apps' -and $_.Kind -eq 'Package' -and $_.Data.Id -eq 'XP8CLZL93F5Z4P' -and $_.Data.Source -eq 'msstore' })
+Assert ($nvidiaApp.Count -eq 1 -and (Get-EceniOperationContext $nvidiaApp[0]) -eq 'User') 'NVIDIA App uses its Microsoft Store product ID in user context'
 $batCave = @($plan | Where-Object { $_.Kind -eq 'NetworkProfile' -and $_.Data.Name -eq 'TheBatCave' -and $_.Data.Category -eq 'Private' })
 Assert ($batCave.Count -eq 1 -and (Get-EceniOperationContext $batCave[0]) -eq 'Machine') 'TheBatCave is conditionally configured as a private network in machine context'
 $profile.Options.PackageVersionLocks['Microsoft.PowerToys'] = '0.95.1'
@@ -78,7 +79,7 @@ Assert ((Get-EceniOperationContext ($plan | Where-Object { $_.Name -eq 'Fast Sta
 Assert ((Get-EceniOperationContext ($plan | Where-Object { $_.Name -eq 'Remove OneDrive' })) -eq 'User') 'User-scoped WinGet uninstall avoids elevation'
 Assert (@($plan | Where-Object { (Get-EceniOperationContext $_) -eq 'User' }).Count -gt 20) 'Plan identifies per-user operations explicitly'
 $mixedContextStages = @($plan | Where-Object Kind -ne 'Manual' | Group-Object Stage | Where-Object { @($_.Group | ForEach-Object { Get-EceniOperationContext $_ } | Select-Object -Unique).Count -gt 1 } | Select-Object -ExpandProperty Name)
-Assert (($mixedContextStages -join ',') -eq 'Containers,Toolchains,Windows') 'Windows, Toolchains and Containers require both execution contexts'
+Assert (($mixedContextStages -join ',') -eq 'Apps,Containers,Toolchains,Windows') 'Windows, Toolchains, Apps and Containers require both execution contexts'
 
 # Plan and WhatIf must not create logs or invoke any privileged handler.
 $tmp = Join-Path $ScratchRoot ('tests-' + [guid]::NewGuid().ToString('N'))

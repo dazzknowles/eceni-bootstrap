@@ -21,7 +21,6 @@ Do not disable UAC, lower its notification level, delete the Codex sandbox accou
 - [ ] Install MariaDB **client** tools inside Rocky (`sudo dnf install mariadb`). Do not install a native Windows MariaDB server. DataGrip and dbForge supply GUI access.
 - [ ] Decide whether to enable Docker. It is off in `Catwoman.psd1`; set `Options.Docker = $true`, rerun Containers after WSL is ready, and complete Docker Desktop's first-run setup.
 - [ ] Install the current [ChatGPT Windows app](https://chatgpt.com/download/). The previously used Store ID `9NT1R1C2HH7J` is now labelled **ChatGPT Classic**, so v0.1 does not silently choose it.
-- [ ] Install the current [NVIDIA App](https://www.nvidia.com/en-gb/software/nvidia-app/) from NVIDIA's official download page. It is an Apps-stage manual item because no verified WinGet manifest is available.
 - [ ] Select the correct notebook GPU/Windows version at [NVIDIA Drivers](https://www.nvidia.com/en-gb/drivers/) and install the **Studio Driver**. Game Ready is not the baseline.
 - [ ] Keyboard lighting remains **TBD** until a lightweight alternative has been tested. Do not install MSI Center just for RGB.
 - [ ] Sign in to 1Password, GitHub, JetBrains, Claude/Claude Code, ChatGPT/Codex, Tailscale, Windscribe, Steam and Store apps as needed. Store entitlement/region or paid utility purchases remain interactive.

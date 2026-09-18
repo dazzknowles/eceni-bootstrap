@@ -71,6 +71,14 @@
             Stage = 'Apps'
         }
         @{
+            Name = 'NVIDIA App'
+            Id = 'XP8CLZL93F5Z4P'
+            Type = 'WinGet'
+            Source = 'msstore'
+            Scope = 'User'
+            Stage = 'Apps'
+        }
+        @{
             Name = 'Apple Music'
             Id = '9PFHDD62MXS1'
             Type = 'WinGet'

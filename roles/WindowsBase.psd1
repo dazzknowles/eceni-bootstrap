@@ -59,12 +59,6 @@
     )
     Manual = @(
         @{
-            Name = 'NVIDIA App'
-            Stage = 'Apps'
-            Instructions = 'Download and install the current NVIDIA App from NVIDIA. Keep the driver preference on Studio Driver rather than Game Ready.'
-            Url = 'https://www.nvidia.com/en-gb/software/nvidia-app/'
-        }
-        @{
             Name = 'NVIDIA Studio Driver'
             Stage = 'Manual'
             Instructions = 'Select the actual notebook GPU and Windows version, then Studio Driver. Do not select Game Ready or add MSI Center.'
