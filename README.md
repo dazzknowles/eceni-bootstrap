@@ -119,7 +119,7 @@ A lock pins a fresh bootstrap install to that version and makes the managed upda
 | IDEs | VS Code and JetBrains Toolbox; all nine requested JetBrains products are listed for installation through Toolbox |
 | Database | SSMS 22 and Bruno; explicit dbForge and MariaDB-client follow-up |
 | AI | Claude desktop and Claude Code; current ChatGPT desktop download is a manual step |
-| Apps | Termius, Oh My Posh, Notepad++, Steam, PowerToys, Chrome, EarTrumpet, Tailscale, Windscribe, Apple Music, WhatsApp, Paste File, Simple Screen Ruler; NVIDIA App via its official installer |
+| Apps | Termius, Oh My Posh, Notepad++, CopyQ, Steam, PowerToys, Chrome, EarTrumpet, Tailscale, Windscribe, Apple Music, WhatsApp, Paste File, Simple Screen Ruler; NVIDIA App via its official installer |
 | Containers | Machine-scoped symlink repair and WSL/Virtual Machine Platform features; user-scoped WSL2 default; checksum-verified Rocky Linux 10 WSL image, registered as the default distro; Docker Desktop opt-in |
 | Development | Git defaults/LFS, PowerShell `csrc` navigation helper and Oh My Posh initialization, pnpm, Codex CLI, Codex/Claude Windows Terminal profiles, credential-free AWS profile example |
 | ConfigLinks | Flat navigation tree at `D:\Config`; directory junctions and file shortcuts; generated location/secrets index |

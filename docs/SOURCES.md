@@ -1,6 +1,6 @@
 # Installation sources and verification
 
-Checked against primary vendor/catalogue sources on 16–17 September 2026. All 33 listed WinGet package directories returned HTTP 200 from Microsoft's official winget-pkgs repository. This confirms catalogue identifiers, not successful installation on Catwoman. Run tools/Verify-Packages.ps1 against the live WinGet sources before Apply; Store eligibility and installer availability can still vary.
+Checked against primary vendor/catalogue sources on 16–18 September 2026. All 34 listed WinGet package directories returned HTTP 200 from Microsoft's official winget-pkgs repository. This confirms catalogue identifiers, not successful installation on Catwoman. Run tools/Verify-Packages.ps1 against the live WinGet sources before Apply; Store eligibility and installer availability can still vary.
 
 | Package ID | Official catalogue |
 | --- | --- |
@@ -30,6 +30,7 @@ Checked against primary vendor/catalogue sources on 16–17 September 2026. All 
 | Termius.Termius | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/t/Termius/Termius) |
 | JanDeDobbeleer.OhMyPosh | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/j/JanDeDobbeleer/OhMyPosh) |
 | Notepad++.Notepad++ | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/n/Notepad++/Notepad++) |
+| hluk.CopyQ | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/h/hluk/CopyQ) |
 | Valve.Steam | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/v/Valve/Steam) |
 | Microsoft.PowerToys | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/m/Microsoft/PowerToys) |
 | Google.Chrome | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/g/Google/Chrome) |

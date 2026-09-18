@@ -22,6 +22,13 @@
             Stage = 'Apps'
         }
         @{
+            Name = 'CopyQ'
+            Id = 'hluk.CopyQ'
+            Type = 'WinGet'
+            Source = 'winget'
+            Stage = 'Apps'
+        }
+        @{
             Name = 'Steam'
             Id = 'Valve.Steam'
             Type = 'WinGet'

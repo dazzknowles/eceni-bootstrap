@@ -32,6 +32,7 @@ Assert ($plan.Count -gt 100) 'Complete profile produces more than 100 explicit o
 Assert (@($plan | Where-Object { $_.Data.Id -eq 'Docker.DockerDesktop' }).Count -eq 0) 'Docker is not enabled by default'
 Assert (@($plan | Where-Object { $_.Data.Id -match 'MariaDB.*Server|MariaDB.Server|MSI.Center' }).Count -eq 0) 'No MariaDB server or MSI Center installer'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Appx' -and $_.Data.Name -match 'Solitaire|WindowsStore|DesktopAppInstaller' }).Count -eq 0) 'Solitaire, Store and App Installer are preserved'
+Assert (@($plan | Where-Object { $_.Kind -eq 'Package' -and $_.Data.Id -eq 'hluk.CopyQ' -and $_.Stage -eq 'Apps' }).Count -eq 1) 'CopyQ is included in the Apps stage'
 Assert (@($plan | Where-Object { $_.Name -eq 'NVIDIA App' -and $_.Stage -eq 'Apps' -and $_.Kind -eq 'Manual' -and $_.Data.Url -eq 'https://www.nvidia.com/en-gb/software/nvidia-app/' }).Count -eq 1) 'NVIDIA App is listed from the official vendor source'
 $batCave = @($plan | Where-Object { $_.Kind -eq 'NetworkProfile' -and $_.Data.Name -eq 'TheBatCave' -and $_.Data.Category -eq 'Private' })
 Assert ($batCave.Count -eq 1 -and (Get-EceniOperationContext $batCave[0]) -eq 'Machine') 'TheBatCave is conditionally configured as a private network in machine context'
