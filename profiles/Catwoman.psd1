@@ -62,10 +62,13 @@
         'Microsoft.YourPhone'
         'Microsoft.XboxGamingOverlay'
         'Microsoft.XboxGameOverlay'
+        'Microsoft.Xbox.TCUI'
         'Microsoft.GamingApp'
         'Microsoft.XboxApp'
         'Microsoft.XboxIdentityProvider'
         'Microsoft.XboxSpeechToTextOverlay'
+        'Microsoft.BingWeather'
+        'Microsoft.MicrosoftStickyNotes'
         'Clipchamp.Clipchamp'
         'Microsoft.Windows.DevHome'
     )

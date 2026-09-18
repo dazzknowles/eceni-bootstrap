@@ -80,6 +80,7 @@ function Get-EceniPlan {
         $items.Add((New-EceniOperation 'Windows' 'RemoteDesktop' 'Allow Remote Desktop connections' 'Enable RDP host access with Network Level Authentication and the built-in TCP/UDP firewall rules' @{
             RuleNames=@('RemoteDesktop-UserMode-In-TCP','RemoteDesktop-UserMode-In-UDP')
         }))
+        $items.Add((New-EceniOperation 'Windows' 'AppLocker' 'Prevent Microsoft Copilot reinstall' 'Merge a Microsoft-recommended packaged-app deny rule for Microsoft.Copilot; preserve existing AppLocker rules'))
         foreach ($name in $Profile.RemoveAppx) { $items.Add((New-EceniOperation 'Windows' 'Appx' "Remove $name" 'Current-user package only; skip if absent or protected' @{Name=$name})) }
         foreach ($package in $Profile.RemoveWinGet) { $items.Add((New-EceniOperation 'Windows' 'Uninstall' "Remove $($package.Name)" $package.Id $package)) }
         $items.Add((New-EceniOperation 'Windows' 'Feature' 'Disable Recall component' 'Recall: disabled if available; no restart' @{Name='Recall';Enabled=$false}))
@@ -321,6 +322,87 @@ function Invoke-EceniAppx {
     }
     if (@(Get-AppxPackage -Name $Name -ErrorAction Stop | Where-Object Name -eq $Name).Count) { throw 'Package still present after removal.' }
     if ($changed) { return New-EceniResult 'Changed' 'Removed from current user; provisioned image and other accounts untouched.' }
+}
+
+function Set-EceniCopilotAppLockerPolicy {
+    param([string]$LogRoot)
+    $allowRuleId = '{A04EAA84-4C85-4D65-9D37-ECE100000001}'
+    $denyRuleId = '{A04EAA84-4C85-4D65-9D37-ECE100000002}'
+    if (-not (Get-Command Get-AppLockerPolicy -ErrorAction SilentlyContinue) -or -not (Get-Command Set-AppLockerPolicy -ErrorAction SilentlyContinue)) {
+        throw 'AppLocker PowerShell cmdlets are unavailable on this Windows installation.'
+    }
+    $currentText = [string](Get-AppLockerPolicy -Local -Xml -ErrorAction Stop)
+    $current = [xml]$currentText
+    $appx = @()
+    if ($current.AppLockerPolicy.PSObject.Properties['RuleCollection']) {
+        $appx = @($current.AppLockerPolicy.RuleCollection | Where-Object Type -eq 'Appx')
+    }
+    $ruleIds = @()
+    if ($appx.Count -and $appx[0].PSObject.Properties['FilePublisherRule']) {
+        $ruleIds = @($appx[0].FilePublisherRule | ForEach-Object Id)
+    }
+    $policyReady = $appx.Count -eq 1 -and $appx[0].EnforcementMode -eq 'Enabled' -and $denyRuleId -in $ruleIds
+    $service = Get-Service -Name AppIDSvc -ErrorAction Stop
+    $serviceReady = $service.StartType -eq 'Automatic' -and $service.Status -eq 'Running'
+    if ($policyReady -and $serviceReady) { return New-EceniResult 'AlreadyOK' 'Microsoft Copilot is blocked by the enforced packaged-app policy.' }
+
+    $changed = $false
+    if (-not $policyReady) {
+        $allowRule = ''
+        if (-not $ruleIds.Count) {
+            $allowRule = @"
+    <FilePublisherRule Id="$allowRuleId" Name="Eceni: allow signed packaged apps" Description="Required baseline so adding the first Appx deny rule does not block every other packaged app." UserOrGroupSid="S-1-1-0" Action="Allow">
+      <Conditions>
+        <FilePublisherCondition PublisherName="*" ProductName="*" BinaryName="*">
+          <BinaryVersionRange LowSection="0.0.0.0" HighSection="*" />
+        </FilePublisherCondition>
+      </Conditions>
+    </FilePublisherRule>
+"@
+        }
+        $policyXml = @"
+<AppLockerPolicy Version="1">
+  <RuleCollection Type="Appx" EnforcementMode="Enabled">
+$allowRule
+    <FilePublisherRule Id="$denyRuleId" Name="Eceni: block Microsoft Copilot" Description="Prevent the consumer Microsoft Copilot package from installing or running." UserOrGroupSid="S-1-1-0" Action="Deny">
+      <Conditions>
+        <FilePublisherCondition PublisherName="CN=MICROSOFT CORPORATION, O=MICROSOFT CORPORATION, L=REDMOND, S=WASHINGTON, C=US" ProductName="MICROSOFT.COPILOT" BinaryName="*">
+          <BinaryVersionRange LowSection="0.0.0.0" HighSection="*" />
+        </FilePublisherCondition>
+      </Conditions>
+    </FilePublisherRule>
+  </RuleCollection>
+</AppLockerPolicy>
+"@
+        $backup = Join-Path $LogRoot 'applocker-before.xml'
+        if (-not (Test-Path -LiteralPath $backup)) { [IO.File]::WriteAllText($backup,$currentText) }
+        $policyFile = Join-Path $LogRoot 'eceni-copilot-applocker.xml'
+        try {
+            [IO.File]::WriteAllText($policyFile,$policyXml)
+            Set-AppLockerPolicy -XmlPolicy $policyFile -Merge -Confirm:$false -ErrorAction Stop
+        } finally {
+            Remove-Item -LiteralPath $policyFile -Force -ErrorAction SilentlyContinue
+        }
+        $changed = $true
+        $verified = [xml]([string](Get-AppLockerPolicy -Local -Xml -ErrorAction Stop))
+        $verifiedAppx = @($verified.AppLockerPolicy.RuleCollection | Where-Object Type -eq 'Appx')
+        $verifiedIds = @($verifiedAppx.FilePublisherRule | ForEach-Object Id)
+        if ($verifiedAppx.Count -ne 1 -or $verifiedAppx[0].EnforcementMode -ne 'Enabled' -or $denyRuleId -notin $verifiedIds) {
+            throw 'The Copilot deny rule was not present in an enforced Appx collection after merge.'
+        }
+    }
+    $service = Get-Service -Name AppIDSvc -ErrorAction Stop
+    if ($service.StartType -ne 'Automatic') {
+        $r = Invoke-EceniNative 'sc.exe' @('config','AppIDSvc','start=auto')
+        Assert-EceniNativeSuccess $r 'Configure Application Identity service'
+        $changed = $true
+    }
+    $service = Get-Service -Name AppIDSvc -ErrorAction Stop
+    if ($service.Status -ne 'Running') { Start-Service -Name AppIDSvc -ErrorAction Stop; $changed = $true }
+    $service = Get-Service -Name AppIDSvc -ErrorAction Stop
+    if ($service.StartType -ne 'Automatic' -or $service.Status -ne 'Running') { throw 'Application Identity service is not automatic and running; the Copilot block cannot be enforced.' }
+    if ($changed) { return New-EceniResult 'Changed' 'Microsoft Copilot removed separately and blocked from reinstalling or running; existing AppLocker rules preserved.' }
+    New-EceniResult 'AlreadyOK' 'Microsoft Copilot is blocked by the enforced packaged-app policy.'
 }
 
 function Set-EceniNetworkProfile {
@@ -817,6 +899,7 @@ function Invoke-EceniOperation {
         'Registry' { return Set-EceniRegistry $Operation.Data $LogRoot }
         'SoundScheme' { return Set-EceniNoSoundsScheme $LogRoot }
         'Appx' { return Invoke-EceniAppx $Operation.Data.Name }
+        'AppLocker' { return Set-EceniCopilotAppLockerPolicy $LogRoot }
         'NetworkProfile' { return Set-EceniNetworkProfile $Operation.Data }
         'Package' { return Invoke-EceniPackage $Operation.Data }
         'Uninstall' { return Invoke-EceniPackage $Operation.Data -Uninstall }

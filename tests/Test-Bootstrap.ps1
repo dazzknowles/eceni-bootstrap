@@ -32,6 +32,8 @@ Assert ($plan.Count -gt 100) 'Complete profile produces more than 100 explicit o
 Assert (@($plan | Where-Object { $_.Data.Id -eq 'Docker.DockerDesktop' }).Count -eq 0) 'Docker is not enabled by default'
 Assert (@($plan | Where-Object { $_.Data.Id -match 'MariaDB.*Server|MariaDB.Server|MSI.Center' }).Count -eq 0) 'No MariaDB server or MSI Center installer'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Appx' -and $_.Data.Name -match 'Solitaire|WindowsStore|DesktopAppInstaller' }).Count -eq 0) 'Solitaire, Store and App Installer are preserved'
+Assert (@($plan | Where-Object { $_.Kind -eq 'Appx' -and $_.Data.Name -in @('Microsoft.Xbox.TCUI','Microsoft.BingWeather','Microsoft.MicrosoftStickyNotes','7EE7776C.LinkedInforWindows') }).Count -eq 4) 'Xbox Live, Weather, Sticky Notes and LinkedIn are removed for the current user'
+Assert (@($plan | Where-Object { $_.Kind -eq 'AppLocker' -and $_.Name -eq 'Prevent Microsoft Copilot reinstall' }).Count -eq 1) 'Windows includes the machine-scoped Copilot AppLocker block'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Package' -and $_.Data.Id -eq 'hluk.CopyQ' -and $_.Stage -eq 'Apps' }).Count -eq 1) 'CopyQ is included in the Apps stage'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Package' -and $_.Data.Id -eq 'Google.GoogleDrive' -and $_.Stage -eq 'Apps' }).Count -eq 1) 'Google Drive for desktop is included in the Apps stage'
 $nvidiaApp = @($plan | Where-Object { $_.Name -eq 'Install NVIDIA App' -and $_.Stage -eq 'Apps' -and $_.Kind -eq 'Package' -and $_.Data.Id -eq 'XP8CLZL93F5Z4P' -and $_.Data.Source -eq 'msstore' })
@@ -64,6 +66,9 @@ Assert (@($plan | Where-Object { $_.Kind -eq 'Manual' -and $_.Name -eq 'Git iden
 Assert ((Get-EceniOperationContext ($plan | Where-Object { $_.Name -eq 'Show file extensions' })) -eq 'User') 'HKCU settings use normal user context'
 $desktopIcons = @($plan | Where-Object { $_.Name -eq 'Desktop icons hidden' })
 Assert ($desktopIcons.Count -eq 1 -and $desktopIcons[0].Data.Path -eq 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -and $desktopIcons[0].Data.ValueName -eq 'HideIcons' -and $desktopIcons[0].Data.Value -eq 1) 'Desktop icons are hidden in the Windows plan'
+$widgets = @($plan | Where-Object { $_.Name -eq 'Taskbar Widgets hidden' })
+$widgetsPolicy = @($plan | Where-Object { $_.Name -eq 'Widgets allowed' })
+Assert ($widgets.Count -eq 1 -and $widgets[0].Data.ValueName -eq 'TaskbarDa' -and $widgets[0].Data.Value -eq 0 -and $widgetsPolicy.Count -eq 1 -and $widgetsPolicy[0].Data.Value -eq 1) 'Widgets stay enabled while their taskbar button is hidden'
 $notificationSound = @($plan | Where-Object { $_.Name -eq 'Notification sounds off' })
 Assert ($notificationSound.Count -eq 1 -and $notificationSound[0].Data.Path -eq 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings' -and $notificationSound[0].Data.ValueName -eq 'NOC_GLOBAL_SETTING_ALLOW_NOTIFICATION_SOUND' -and $notificationSound[0].Data.Value -eq 0) 'Notification sounds are disabled in the Windows plan'
 $noSounds = @($plan | Where-Object { $_.Kind -eq 'SoundScheme' -and $_.Name -eq 'Windows sound scheme: No Sounds' })
@@ -216,6 +221,39 @@ $gitCalls = & $module { $script:gitCalls.ToArray() }
 Assert ($a.Status -eq 'Changed' -and $b.Status -eq 'AlreadyOK') 'Managed Git configuration is idempotent'
 Assert ($gitState['user.name'] -eq 'Dazz Knowles' -and $gitState['user.email'] -eq 'me@dazzknowles.co.uk') 'Requested Git name and email are configured exactly'
 Assert (@($gitCalls | Where-Object { $_.Arguments[0] -eq 'config' -and $_.Arguments[1] -ne '--global' }).Count -eq 0) 'Managed Git settings use the current user global config'
+
+# The Copilot block merges a narrow packaged-app rule and enables its enforcement service.
+$appLockerLog = Join-Path $tmp 'applocker-logs'
+New-Item -ItemType Directory -Path $appLockerLog -Force | Out-Null
+& $module {
+    $script:appLockerText = '<AppLockerPolicy Version="1"></AppLockerPolicy>'
+    $script:appIdStartType = 'Manual'
+    $script:appIdStatus = 'Stopped'
+    function script:Get-Command { param($Name,$ErrorAction) [pscustomobject]@{Name=$Name} }
+    function script:Get-AppLockerPolicy { param([switch]$Local,[switch]$Xml,$ErrorAction) $script:appLockerText }
+    function script:Set-AppLockerPolicy {
+        param($XmlPolicy,[switch]$Merge,[switch]$Confirm,$ErrorAction)
+        $script:appLockerText = [IO.File]::ReadAllText($XmlPolicy)
+    }
+    function script:Get-Service {
+        param($Name,$ErrorAction)
+        [pscustomobject]@{Name=$Name;StartType=$script:appIdStartType;Status=$script:appIdStatus}
+    }
+    function script:Start-Service { param($Name,$ErrorAction) $script:appIdStatus='Running' }
+    function script:Invoke-EceniNative {
+        param([string]$File,[string[]]$Arguments)
+        if ($File -eq 'sc.exe' -and $Arguments[0] -eq 'config') { $script:appIdStartType='Automatic' }
+        [pscustomobject]@{Code=0;Output=''}
+    }
+}
+$a = & $module { param($l) Set-EceniCopilotAppLockerPolicy $l } $appLockerLog
+$b = & $module { param($l) Set-EceniCopilotAppLockerPolicy $l } $appLockerLog
+$appLockerXml = [xml](& $module { $script:appLockerText })
+$appxRules = @($appLockerXml.AppLockerPolicy.RuleCollection.FilePublisherRule)
+Assert ($a.Status -eq 'Changed' -and $b.Status -eq 'AlreadyOK') 'Copilot AppLocker policy and service configuration are idempotent'
+Assert (@($appxRules | Where-Object { $_.Action -eq 'Deny' -and $_.Conditions.FilePublisherCondition.ProductName -eq 'MICROSOFT.COPILOT' }).Count -eq 1) 'AppLocker deny rule targets only the Microsoft Copilot package'
+Assert (@($appxRules | Where-Object { $_.Action -eq 'Allow' -and $_.Conditions.FilePublisherCondition.ProductName -eq '*' }).Count -eq 1) 'Other signed packaged apps remain allowed'
+Assert ((Test-Path (Join-Path $appLockerLog 'applocker-before.xml')) -and -not (Test-Path (Join-Path $appLockerLog 'eceni-copilot-applocker.xml'))) 'Existing AppLocker policy is backed up and the merge file is removed'
 
 # Filesystem behaviour tested only under this project's work directory.
 Import-Module (Join-Path $root 'modules\Eceni.psm1') -Force

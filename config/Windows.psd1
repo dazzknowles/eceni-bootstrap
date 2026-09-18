@@ -37,6 +37,12 @@
             Value = 0
         }
         @{
+            Name = 'Taskbar Widgets hidden'
+            Path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+            ValueName = 'TaskbarDa'
+            Value = 0
+        }
+        @{
             Name = 'Notification sounds off'
             Path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings'
             ValueName = 'NOC_GLOBAL_SETTING_ALLOW_NOTIFICATION_SOUND'
@@ -255,10 +261,10 @@
             Policy = $true
         }
         @{
-            Name = 'Widgets policy off'
+            Name = 'Widgets allowed'
             Path = 'HKLM:\SOFTWARE\Policies\Microsoft\Dsh'
             ValueName = 'AllowNewsAndInterests'
-            Value = 0
+            Value = 1
             Policy = $true
         }
         @{
