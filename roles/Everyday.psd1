@@ -64,6 +64,13 @@
             Stage = 'Apps'
         }
         @{
+            Name = 'SteelSeries GG'
+            Id = 'SteelSeries.GG'
+            Type = 'WinGet'
+            Source = 'winget'
+            Stage = 'Apps'
+        }
+        @{
             Name = 'Tailscale'
             Id = 'Tailscale.Tailscale'
             Type = 'WinGet'
@@ -80,6 +87,14 @@
         @{
             Name = 'NVIDIA App'
             Id = 'XP8CLZL93F5Z4P'
+            Type = 'WinGet'
+            Source = 'msstore'
+            Scope = 'User'
+            Stage = 'Apps'
+        }
+        @{
+            Name = 'MSI Center'
+            Id = '9NVMNJCR03XV'
             Type = 'WinGet'
             Source = 'msstore'
             Scope = 'User'

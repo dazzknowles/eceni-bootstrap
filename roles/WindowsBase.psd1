@@ -61,13 +61,13 @@
         @{
             Name = 'NVIDIA Studio Driver'
             Stage = 'Manual'
-            Instructions = 'Select the actual notebook GPU and Windows version, then Studio Driver. Do not select Game Ready or add MSI Center.'
+            Instructions = 'Select the actual notebook GPU and Windows version, then Studio Driver. Do not select Game Ready.'
             Url = 'https://www.nvidia.com/en-gb/drivers/'
         }
         @{
-            Name = 'Keyboard lighting'
+            Name = 'MSI and SteelSeries feature selection'
             Stage = 'Manual'
-            Instructions = 'TBD: test lightweight alternatives first. No RGB package or MSI Center in the baseline.'
+            Instructions = 'Launch MSI Center and SteelSeries GG, accept any required vendor terms, then enable only the hardware, lighting and audio modules actually needed. Review driver suggestions rather than replacing the selected NVIDIA Studio Driver automatically.'
             Url = ''
         }
         @{

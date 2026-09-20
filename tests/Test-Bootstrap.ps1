@@ -30,12 +30,15 @@ $profile = Import-EceniProfile (Join-Path $root 'profiles\Catwoman.psd1') $root
 $plan = @(Get-EceniPlan $profile $root)
 Assert ($plan.Count -gt 100) 'Complete profile produces more than 100 explicit operations'
 Assert (@($plan | Where-Object { $_.Data.Id -eq 'Docker.DockerDesktop' }).Count -eq 0) 'Docker is not enabled by default'
-Assert (@($plan | Where-Object { $_.Data.Id -match 'MariaDB.*Server|MariaDB.Server|MSI.Center' }).Count -eq 0) 'No MariaDB server or MSI Center installer'
+Assert (@($plan | Where-Object { $_.Data.Id -match 'MariaDB.*Server|MariaDB.Server' }).Count -eq 0) 'No MariaDB server installer'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Appx' -and $_.Data.Name -match 'Solitaire|WindowsStore|DesktopAppInstaller' }).Count -eq 0) 'Solitaire, Store and App Installer are preserved'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Appx' -and $_.Data.Name -in @('Microsoft.Xbox.TCUI','Microsoft.BingWeather','Microsoft.MicrosoftStickyNotes','7EE7776C.LinkedInforWindows') }).Count -eq 4) 'Xbox Live, Weather, Sticky Notes and LinkedIn are removed for the current user'
 Assert (@($plan | Where-Object { $_.Kind -eq 'AppLocker' -and $_.Name -eq 'Prevent Microsoft Copilot reinstall' }).Count -eq 1) 'Windows includes the machine-scoped Copilot AppLocker block'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Package' -and $_.Data.Id -eq 'hluk.CopyQ' -and $_.Stage -eq 'Apps' }).Count -eq 1) 'CopyQ is included in the Apps stage'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Package' -and $_.Data.Id -eq 'Google.GoogleDrive' -and $_.Stage -eq 'Apps' }).Count -eq 1) 'Google Drive for desktop is included in the Apps stage'
+Assert (@($plan | Where-Object { $_.Kind -eq 'Package' -and $_.Data.Id -eq 'SteelSeries.GG' -and $_.Data.Source -eq 'winget' -and $_.Stage -eq 'Apps' }).Count -eq 1) 'SteelSeries GG is included in the Apps machine batch'
+$msiCenter = @($plan | Where-Object { $_.Kind -eq 'Package' -and $_.Data.Id -eq '9NVMNJCR03XV' -and $_.Data.Source -eq 'msstore' -and $_.Stage -eq 'Apps' })
+Assert ($msiCenter.Count -eq 1 -and (Get-EceniOperationContext $msiCenter[0]) -eq 'User') 'MSI Center uses its Microsoft Store product ID in user context'
 $nvidiaApp = @($plan | Where-Object { $_.Name -eq 'Install NVIDIA App' -and $_.Stage -eq 'Apps' -and $_.Kind -eq 'Package' -and $_.Data.Id -eq 'XP8CLZL93F5Z4P' -and $_.Data.Source -eq 'msstore' })
 Assert ($nvidiaApp.Count -eq 1 -and (Get-EceniOperationContext $nvidiaApp[0]) -eq 'User') 'NVIDIA App uses its Microsoft Store product ID in user context'
 $batCave = @($plan | Where-Object { $_.Kind -eq 'NetworkProfile' -and $_.Data.Name -eq 'TheBatCave' -and $_.Data.Category -eq 'Private' })
@@ -53,7 +56,7 @@ $stages = @(Get-EceniPlan $profile $root -Stage @('Foundations','AI') | Select-O
 Assert (($stages -join ',') -eq 'Foundations,AI') 'Stage selection preserves canonical order'
 $packages = @($plan | Where-Object Kind -eq 'Package')
 Assert (@($packages | Group-Object Detail | Where-Object Count -gt 1).Count -eq 0) 'No duplicate package installs'
-Assert (@($plan | Where-Object { $_.Name -eq 'Keyboard lighting' -and $_.Kind -eq 'Manual' }).Count -eq 1) 'Keyboard lighting remains pending'
+Assert (@($plan | Where-Object { $_.Name -eq 'MSI and SteelSeries feature selection' -and $_.Kind -eq 'Manual' }).Count -eq 1) 'MSI and SteelSeries optional feature selection remains explicit'
 $rockyWsl = @($plan | Where-Object Kind -eq 'WslDistro')
 Assert ($rockyWsl.Count -eq 1 -and $rockyWsl[0].Data.Major -eq 10 -and $rockyWsl[0].Data.DistroName -eq 'RockyLinux-10') 'Rocky Linux 10 is the configured WSL distribution'
 Assert ((Get-EceniOperationContext $rockyWsl[0]) -eq 'User') 'Rocky WSL registration uses normal user context'

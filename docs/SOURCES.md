@@ -1,6 +1,6 @@
 # Installation sources and verification
 
-Checked against primary vendor/catalogue sources on 16–18 September 2026. All 35 listed WinGet package directories returned HTTP 200 from Microsoft's official winget-pkgs repository. This confirms catalogue identifiers, not successful installation on Catwoman. Run tools/Verify-Packages.ps1 against the live WinGet sources before Apply; Store eligibility and installer availability can still vary.
+Checked against primary vendor/catalogue sources on 16–20 September 2026. All 36 listed WinGet package directories returned HTTP 200 from Microsoft's official winget-pkgs repository. This confirms catalogue identifiers, not successful installation on Catwoman. Run tools/Verify-Packages.ps1 against the live WinGet sources before Apply; Store eligibility and installer availability can still vary.
 
 | Package ID | Official catalogue |
 | --- | --- |
@@ -36,6 +36,7 @@ Checked against primary vendor/catalogue sources on 16–18 September 2026. All 
 | Google.Chrome | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/g/Google/Chrome) |
 | Google.GoogleDrive | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/g/Google/GoogleDrive) |
 | File-New-Project.EarTrumpet | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/f/File-New-Project/EarTrumpet) |
+| SteelSeries.GG | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/s/SteelSeries/GG) |
 | Tailscale.Tailscale | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/t/Tailscale/Tailscale) |
 | Windscribe.Windscribe | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/w/Windscribe/Windscribe) |
 | Docker.DockerDesktop | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/d/Docker/DockerDesktop) |
@@ -44,7 +45,8 @@ Docker is verified but opt-in. The VS Build Tools entry supplies the C++ workloa
 
 ## Other sources
 
-- [NVIDIA App](https://apps.microsoft.com/detail/xp8clzl93f5z4p), [Apple Music](https://apps.microsoft.com/detail/9pfhdd62mxs1), [WhatsApp](https://apps.microsoft.com/detail/9nksqgp7f2nh), [Paste File for File Explorer](https://apps.microsoft.com/detail/9pp2mwpbzfgh), [Simple Screen Ruler](https://apps.microsoft.com/detail/9wzdncrdhvfg): verified official Store product pages and IDs. Entitlement/region/payment requirements are handled by Store; the bootstrap does not purchase apps.
+- [NVIDIA App](https://apps.microsoft.com/detail/xp8clzl93f5z4p), [MSI Center](https://apps.microsoft.com/detail/9nvmnjcr03xv), [Apple Music](https://apps.microsoft.com/detail/9pfhdd62mxs1), [WhatsApp](https://apps.microsoft.com/detail/9nksqgp7f2nh), [Paste File for File Explorer](https://apps.microsoft.com/detail/9pp2mwpbzfgh), [Simple Screen Ruler](https://apps.microsoft.com/detail/9wzdncrdhvfg): verified official Store product pages and IDs. Entitlement/region/payment requirements are handled by Store; the bootstrap does not purchase apps.
+- [SteelSeries GG](https://steelseries.com/gg): SteelSeries' official hardware configuration, lighting, audio and capture suite; installed through the verified `SteelSeries.GG` WinGet manifest.
 - [Google Drive for desktop](https://support.google.com/drive/answer/10838124): Google's supported Windows sync client; installed through the verified `Google.GoogleDrive` WinGet manifest. Account sign-in and the stream-versus-mirror choice remain interactive.
 - [JetBrains Toolbox installation](https://www.jetbrains.com/help/toolbox-app/installation.html): Toolbox owns the requested IDEs; choose them after sign-in. v0.1 does not use undocumented Toolbox automation APIs.
 - [dbForge download](https://www.devart.com/dbforge/mysql/studio/download.html) and [command-line installer documentation](https://docs.devart.com/studio-for-mysql/getting-started/installing-from-the-command-line.html): manual vendor installation in v0.1. The official WinGet Devart namespace contained TMetric, not a verified dbForge MySQL package.
