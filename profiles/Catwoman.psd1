@@ -12,7 +12,7 @@
         'Everyday'
     )
     Options = @{
-        Docker = $false
+        Docker = $true
         RockyWsl = @{
             Enabled = $true
             Major = 10

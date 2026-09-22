@@ -41,7 +41,7 @@ Checked against primary vendor/catalogue sources on 16–20 September 2026. All 
 | Windscribe.Windscribe | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/w/Windscribe/Windscribe) |
 | Docker.DockerDesktop | [Manifest directory](https://github.com/microsoft/winget-pkgs/tree/master/manifests/d/Docker/DockerDesktop) |
 
-Docker is verified but opt-in. The VS Build Tools entry supplies the C++ workload and recommended components; an additional workload check handles an existing installation missing MSVC.
+Docker Desktop is enabled in the Catwoman profile. The VS Build Tools entry supplies the C++ workload and recommended components; an additional workload check handles an existing installation missing MSVC.
 
 ## Other sources
 

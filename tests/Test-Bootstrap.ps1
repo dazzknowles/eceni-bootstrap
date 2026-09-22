@@ -29,7 +29,7 @@ $module = Get-Module Eceni
 $profile = Import-EceniProfile (Join-Path $root 'profiles\Catwoman.psd1') $root
 $plan = @(Get-EceniPlan $profile $root)
 Assert ($plan.Count -gt 100) 'Complete profile produces more than 100 explicit operations'
-Assert (@($plan | Where-Object { $_.Data.Id -eq 'Docker.DockerDesktop' }).Count -eq 0) 'Docker is not enabled by default'
+Assert (@($plan | Where-Object { $_.Data.Id -eq 'Docker.DockerDesktop' }).Count -eq 1) 'Docker Desktop is enabled in the Catwoman profile'
 Assert (@($plan | Where-Object { $_.Data.Id -match 'MariaDB.*Server|MariaDB.Server' }).Count -eq 0) 'No MariaDB server installer'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Appx' -and $_.Data.Name -match 'Solitaire|WindowsStore|DesktopAppInstaller' }).Count -eq 0) 'Solitaire, Store and App Installer are preserved'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Appx' -and $_.Data.Name -in @('Microsoft.Xbox.TCUI','Microsoft.BingWeather','Microsoft.MicrosoftStickyNotes','7EE7776C.LinkedInforWindows') }).Count -eq 4) 'Xbox Live, Weather, Sticky Notes and LinkedIn are removed for the current user'
@@ -47,11 +47,11 @@ $profile.Options.PackageVersionLocks['Microsoft.PowerToys'] = '0.95.1'
 $lockedPackage = @(Get-EceniPlan $profile $root | Where-Object { $_.Data.Id -eq 'Microsoft.PowerToys' })
 Assert ($lockedPackage.Count -eq 1 -and $lockedPackage[0].Data.VersionLock -eq '0.95.1' -and $lockedPackage[0].Detail -match 'locked to 0\.95\.1') 'Profile version locks are attached to exact package operations'
 $profile.Options.PackageVersionLocks.Remove('Microsoft.PowerToys')
-$profile.Options.Docker = $true
-Assert (@(Get-EceniPlan $profile $root | Where-Object { $_.Data.Id -eq 'Docker.DockerDesktop' }).Count -eq 1) 'Docker opt-in includes exactly one installer'
-$containerPlan = @(Get-EceniPlan $profile $root -Stage Containers)
-Assert (($containerPlan[0..5].Kind -join ',') -eq 'Symlink,Feature,Feature,Wsl2,WslDistro,Package') 'Symlink repair, WSL features, WSL2 default and Rocky installation precede optional Docker install'
 $profile.Options.Docker = $false
+Assert (@(Get-EceniPlan $profile $root | Where-Object { $_.Data.Id -eq 'Docker.DockerDesktop' }).Count -eq 0) 'Docker can still be disabled by profile'
+$profile.Options.Docker = $true
+$containerPlan = @(Get-EceniPlan $profile $root -Stage Containers)
+Assert (($containerPlan[0..5].Kind -join ',') -eq 'Symlink,Feature,Feature,Wsl2,WslDistro,Package') 'Symlink repair, WSL features, WSL2 default and Rocky installation precede Docker install'
 $stages = @(Get-EceniPlan $profile $root -Stage @('Foundations','AI') | Select-Object -ExpandProperty Stage -Unique)
 Assert (($stages -join ',') -eq 'Foundations,AI') 'Stage selection preserves canonical order'
 $packages = @($plan | Where-Object Kind -eq 'Package')
@@ -90,7 +90,7 @@ Assert (@($plan | Where-Object { $_.Kind -eq 'Registry' -and $_.Data.ValueName -
 Assert ((Get-EceniOperationContext ($plan | Where-Object { $_.Name -eq 'Fast Startup off' })) -eq 'Machine') 'HKLM settings use elevated machine context'
 Assert ((Get-EceniOperationContext ($plan | Where-Object { $_.Name -eq 'Remove OneDrive' })) -eq 'User') 'User-scoped WinGet uninstall avoids elevation'
 Assert (@($plan | Where-Object { (Get-EceniOperationContext $_) -eq 'User' }).Count -gt 20) 'Plan identifies per-user operations explicitly'
-$mixedContextStages = @($plan | Where-Object Kind -ne 'Manual' | Group-Object Stage | Where-Object { @($_.Group | ForEach-Object { Get-EceniOperationContext $_ } | Select-Object -Unique).Count -gt 1 } | Select-Object -ExpandProperty Name)
+$mixedContextStages = @($plan | Where-Object Kind -ne 'Manual' | Group-Object Stage | Where-Object { @($_.Group | ForEach-Object { Get-EceniOperationContext $_ } | Select-Object -Unique).Count -gt 1 } | Select-Object -ExpandProperty Name | Sort-Object)
 Assert (($mixedContextStages -join ',') -eq 'Apps,Containers,Toolchains,Windows') 'Windows, Toolchains, Apps and Containers require both execution contexts'
 
 # Plan and WhatIf must not create logs or invoke any privileged handler.

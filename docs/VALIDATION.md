@@ -1,9 +1,9 @@
-# v0.1 validation — 17 September 2026
+# v0.1 validation — 22 September 2026
 
-- PowerShell 7.6.5: **76 checks passed**.
-- All PowerShell source files parse with the declared Windows PowerShell 5.1-compatible syntax; repeat the complete suite under 5.1 during release acceptance.
-- Default Catwoman plan: **140 operations** across 11 stages, including explicitly manual/deferred items.
-- Microsoft official WinGet repository: **33 package IDs verified**, including opt-in Docker. Four additional Microsoft Store utility/media IDs checked against official product pages.
+- PowerShell 7.6.5 and Windows PowerShell 5.1.26100.9444: **114 checks passed** under each runtime.
+- All PowerShell source files parse with the declared Windows PowerShell 5.1-compatible syntax.
+- Default Catwoman plan: **152 operations** across 11 stages, including explicitly manual/deferred items.
+- Microsoft official WinGet repository: **36 package IDs verified**, including Docker Desktop. Six additional Microsoft Store utility/media IDs are managed by exact product ID.
 - Copy helper: `-WhatIf` created no destination; real copy to an isolated workspace test directory copied and SHA-256 verified all release files present at the time of testing. Existing destination contents are rejected.
 - Bootstrap default and `-Apply -WhatIf` generated plans without creating logs or applying changes.
 - Package install/update/version-lock/error/reboot tests use mocks. Windows feature, network-profile and registry tests use mocks. Directory/junction/profile tests use isolated scratch paths.

@@ -151,7 +151,7 @@
         @{
             Name = 'WSL distribution'
             Stage = 'Containers'
-            Instructions = 'WSL2 features are enabled by the Containers stage. Reboot manually if requested, then choose Rocky or Ubuntu: wsl --list --online; wsl --install -d <exact-name>. Docker remains opt-in.'
+            Instructions = 'WSL2 features and Docker Desktop are installed by the Containers stage. Reboot manually if requested, then choose Rocky or Ubuntu: wsl --list --online; wsl --install -d <exact-name>.'
             Url = ''
         }
     )
