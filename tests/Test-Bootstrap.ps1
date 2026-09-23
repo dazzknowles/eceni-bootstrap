@@ -67,6 +67,8 @@ $gitPlan = @($plan | Where-Object { $_.Kind -eq 'Git' -and $_.Name -eq 'Configur
 Assert ($gitPlan.Count -eq 1 -and $gitPlan[0].Detail -match 'Dazz Knowles <me@dazzknowles\.co\.uk>') 'Development configures the requested global Git identity'
 Assert (@($plan | Where-Object { $_.Kind -eq 'Manual' -and $_.Name -eq 'Git identity and authentication' }).Count -eq 0) 'Configured Git identity is no longer a manual follow-up'
 Assert ((Get-EceniOperationContext ($plan | Where-Object { $_.Name -eq 'Show file extensions' })) -eq 'User') 'HKCU settings use normal user context'
+$recentFiles = @($plan | Where-Object { $_.Name -eq 'Recent files in Start, Explorer and Jump Lists off' })
+Assert ($recentFiles.Count -eq 1 -and $recentFiles[0].Data.ValueName -eq 'Start_TrackDocs' -and $recentFiles[0].Data.Value -eq 0 -and (Get-EceniOperationContext $recentFiles[0]) -eq 'User') 'Recent files are hidden from Start, Explorer and Jump Lists in user context'
 $desktopIcons = @($plan | Where-Object { $_.Name -eq 'Desktop icons hidden' })
 Assert ($desktopIcons.Count -eq 1 -and $desktopIcons[0].Data.Path -eq 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -and $desktopIcons[0].Data.ValueName -eq 'HideIcons' -and $desktopIcons[0].Data.Value -eq 1) 'Desktop icons are hidden in the Windows plan'
 $widgets = @($plan | Where-Object { $_.Name -eq 'Taskbar Widgets hidden' })

@@ -19,6 +19,12 @@
             Value = 1
         }
         @{
+            Name = 'Recent files in Start, Explorer and Jump Lists off'
+            Path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+            ValueName = 'Start_TrackDocs'
+            Value = 0
+        }
+        @{
             Name = 'Desktop icons hidden'
             Path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
             ValueName = 'HideIcons'

@@ -1,8 +1,8 @@
 # v0.1 validation — 22 September 2026
 
-- PowerShell 7.6.5 and Windows PowerShell 5.1.26100.9444: **114 checks passed** under each runtime.
+- PowerShell 7.6.5 and Windows PowerShell 5.1.26100.9444: **115 checks passed** under each runtime.
 - All PowerShell source files parse with the declared Windows PowerShell 5.1-compatible syntax.
-- Default Catwoman plan: **152 operations** across 11 stages, including explicitly manual/deferred items.
+- Default Catwoman plan: **153 operations** across 11 stages, including explicitly manual/deferred items.
 - Microsoft official WinGet repository: **36 package IDs verified**, including Docker Desktop. Six additional Microsoft Store utility/media IDs are managed by exact product ID.
 - Copy helper: `-WhatIf` created no destination; real copy to an isolated workspace test directory copied and SHA-256 verified all release files present at the time of testing. Existing destination contents are rejected.
 - Bootstrap default and `-Apply -WhatIf` generated plans without creating logs or applying changes.
